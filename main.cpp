@@ -9,7 +9,6 @@ using namespace sf;
 
 class Collision {
 public:
-	Collision() {};
 	bool collisionBase(Vector2f firstPos, Vector2f secondPos, Vector2f firstSize, Vector2f secondSize);
 };
 
@@ -573,11 +572,11 @@ TO DO LIST :
 
 WORKING ORDER:
 	CHECK KEY INPUT: OTHERS, MOVEMENT
-	ADD MOVEMENT
+	ADD MOVEMENT/JUMP/FALL
 	CHECK COLLISION: X, Y
 	APPLY MOVEMENT
 	BREATH
-	SET EFFECT
+	UPDATE EFFECT
 	SET POSITION
 	DRAW
 */
