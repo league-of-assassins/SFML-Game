@@ -16,7 +16,7 @@ public:
 class Game {
 private:
 
-	int unsigned width = 1820, height = 1080;
+	int unsigned width = 0, height = 0;
 	RenderWindow window;
 	int frame = 0, tempFrame = 0;
 
@@ -27,10 +27,10 @@ private:
 	Sprite gameOver;
 	Texture texture_gameOver;
 
+
+
 	Sprite heroMask;
 	Texture texture_heroMask;
-
-
 
 	RectangleShape hero;
 	Vector2f heroSize;
@@ -41,8 +41,8 @@ private:
 	float speed = 7;
 
 
-	int heroEffectSize = 25, heroEffectCount = 52, effectStart = -1;
 
+	int heroEffectSize = 25, heroEffectCount = 52, effectStart = -1;
 	int breathingOrder = 1;
 
 
@@ -61,6 +61,8 @@ private:
 	};
 
 	int groundNo = 12;
+
+
 
 
 	bool sit = false, jump = false, jumpFall = false, fall = false, bottom = false, releasedS = true, right = false, left = false, enableEffect = false;
@@ -105,6 +107,9 @@ public:
 
 
 void Game::setWindow() {
+	width = VideoMode::getDesktopMode().width - 100;
+	height = VideoMode::getDesktopMode().height;
+
 	window.create(VideoMode(width, height), "SFML Game", Style::None);
 	window.setFramerateLimit(60);
 }
