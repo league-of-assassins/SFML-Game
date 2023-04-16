@@ -107,7 +107,7 @@ public:
 
 
 void Game::setWindow() {
-	window.create(VideoMode(width, height), "Snakeing grounds", Style::None);
+	window.create(VideoMode(width, height), "SFML Game", Style::None);
 	window.setFramerateLimit(60);
 }
 
@@ -259,7 +259,6 @@ void Game::moveHeroKey() {
 	}
 
 	else if (Keyboard::isKeyPressed(Keyboard::S) && bottom) {
-		cout << "\n e " << frame;
 		if (releasedS) {
 			heroPos.y += 20; heroSize.y -= 20; hero.setSize(heroSize);
 		}
