@@ -9,7 +9,7 @@ using namespace sf;
 
 class Collision {
 public:
-	bool collisionBase(Vector2f firstPos, Vector2f secondPos, Vector2f firstSize, Vector2f secondSize);
+	bool check(Vector2f firstPos, Vector2f secondPos, Vector2f firstSize, Vector2f secondSize);
 };
 
 
@@ -67,7 +67,6 @@ private:
 	bool over = false, restart = true, pause = false, groundCollide = false, borderCollide = false;
 
 public:
-	Collision colObj;
 
 	void setWindow();
 
@@ -99,7 +98,7 @@ public:
 
 	void displays(RectangleShape heroEffect[52]);
 
-	Game(Collision colObj);
+	Game();
 
 	~Game();
 };
@@ -394,6 +393,8 @@ void Game::askMove(int xVelo, int yVelo, bool x) {
 }
 
 void Game::collision(int& i) {
+	Collision collision;
+
 	groundCollide = false;
 	borderCollide = false;
 
@@ -408,14 +409,14 @@ void Game::collision(int& i) {
 
 	//GROUND HIT
 	for (i = 0; i < groundNo; i++) {
-		if (colObj.collisionBase(heroPos, groundPos[i], heroSize, groundSize[i])) {
+		if (collision.check(heroPos, groundPos[i], heroSize, groundSize[i])) {
 			groundCollide = true;
 		}
 		if (groundCollide) { break; }
 	}
 }
 
-bool Collision::collisionBase(Vector2f firstPos, Vector2f secondPos, Vector2f firstSize, Vector2f secondSize) {
+bool Collision::check(Vector2f firstPos, Vector2f secondPos, Vector2f firstSize, Vector2f secondSize) {
 	bool collide = false;
 
 	if ((firstPos.x + firstSize.x > secondPos.x && firstPos.x < secondPos.x + secondSize.x) &&
@@ -477,7 +478,7 @@ void Game::setPositions() {
 }
 
 
-Game::Game(Collision colObj) : colObj(colObj) {
+Game::Game() {
 	RectangleShape heroEffect[52];
 	Vector2f heroEffectPos[52];
 
@@ -558,9 +559,8 @@ void Game::displays(RectangleShape heroEffect[52]) {
 
 int main()
 {
-	Collision colObj;
 
-	Game game(colObj);
+	Game game;
 
 	return 0;
 }
