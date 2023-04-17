@@ -13,10 +13,11 @@ public:
 };
 
 
+
 class Game {
 private:
 
-	int unsigned width, height;
+	unsigned int width, height;
 	RenderWindow window;
 	int frame = 0, tempFrame = 0;
 
@@ -37,20 +38,24 @@ private:
 	Vector2f heroPos;
 	Vector2f heroPosTemp;
 
-	int xVelo = 0, yVelo = 0;
+	int xVelo = 0, yVelo = 7;
 	float speed = 7;
 
 
 
 	int heroEffectSize = 25, heroEffectCount = 52, effectStart = -1;
 	int breathingOrder = 1;
+	bool heroEnemyJump = false, heroLoseHealth = false;
 
 
 	RectangleShape enemy[4];
 	Vector2f enemyPos[4];
 	Vector2f enemySize;
 
-	int enemySpeed = 5, enemyFrameTemp[4] = {0, 120, 0, 300}, enemyRight[4] = { 1, -1, 1, -1 };
+	int enemySpeed = 5, enemyFrameTemp[4] = { 0, 120, 0, 300 }, enemyRight[4] = { 1, -1, 1, -1 };
+	int enemyHitNo = 0;
+	bool enemyCollide = false;
+	bool enemyRemove[4] = { false };
 	bool enemyWait[4] = { false, true, false, true };
 
 	RectangleShape ground[12];
@@ -71,7 +76,8 @@ private:
 
 
 
-	bool sit = false, jump = false, jumpFall = false, fall = false, bottom = false, releasedS = true, right = false, left = false, enableEffect = false;
+	bool sit = false, jump = false, jumpFall = false, bottom = false,
+		groundColX = false, releasedS = true, right = false, left = false, enableEffect = false;
 	bool over = false, restart = true, pause = false, groundCollide = false, borderCollide = false;
 
 public:
@@ -96,7 +102,7 @@ public:
 
 	void jumping();
 
-	void askMove(int xVelo, int yVelo, bool x);
+	void askMove(int xVelo, int yVelo);
 
 	void collision(int& i);
 
@@ -104,7 +110,11 @@ public:
 
 	void breathing();
 
+	void enemyHit();
+
 	void setPositions();
+
+	void frames();
 
 	void displays(RectangleShape heroEffect[52]);
 
@@ -112,6 +122,7 @@ public:
 
 	~Game();
 };
+
 
 
 void Game::setWindow() {
@@ -176,7 +187,7 @@ void Game::objects(RectangleShape heroEffect[52]) {
 	enemySize.y = 25;
 	enemy[0].setSize(enemySize);
 	enemy[0].setFillColor(Color::Red);
-	enemyPos[0].x = 0 - enemySize.x; 
+	enemyPos[0].x = 0 - enemySize.x;
 	enemyPos[0].y = 200;
 	enemy[0].setPosition(enemyPos[0]);
 
@@ -278,7 +289,7 @@ void Game::enemyPhysics() {
 
 		else if (frame == enemyFrameTemp[i]) {
 			enemyPos[i].x = (enemyRight[i] + 1) / 2 * width;
-			enemyPos[i].y = temp + i*135 + rand() % 80;
+			enemyPos[i].y = temp + i * 135 + rand() % 80;
 			temp = 0;
 			enemyRight[i] *= -1;
 			enemyWait[i] = false;
@@ -290,7 +301,6 @@ void Game::enemyPhysics() {
 
 void Game::moveHeroKey() {
 	xVelo = 0;
-	yVelo = 7;
 
 
 	if (Keyboard::isKeyPressed(Keyboard::D)) {
@@ -317,8 +327,9 @@ void Game::moveHeroKey() {
 		if (releasedS) {
 			heroPos.y += 20; heroSize.y -= 20; hero.setSize(heroSize);
 		}
-		releasedS = false;
 		sit = true;
+
+		releasedS = false;
 	}
 }
 
@@ -338,7 +349,10 @@ void Game::jumping() {
 }
 
 void Game::physics() {
+	xVelo = 0; yVelo = 7;
+
 	enableEffect = false;
+
 
 	//DISABLE SIT
 	if (sit && releasedS) {
@@ -372,19 +386,17 @@ void Game::physics() {
 	else { speed = 7; }
 
 
-	//check X collision
-	askMove(xVelo, 0, true);
-
-	//check Y collision
-	askMove(0, yVelo, false);
+	//check collision
+	askMove(xVelo, yVelo);
 
 
 	breathing();
 }
 
-void Game::askMove(int xVelo, int yVelo, bool x) {
+void Game::askMove(int xVelo, int yVelo) {
 	int i = 0;
 	bottom = false;
+
 
 	heroPosTemp = heroPos;
 
@@ -394,58 +406,45 @@ void Game::askMove(int xVelo, int yVelo, bool x) {
 	collision(i);
 
 
-
-	//REJECT MOVE/JUMP/FALL IF COLLIDING
-	if (groundCollide || borderCollide) {
-		heroPos = heroPosTemp;
-	}
-
-	//CHECK IF STANDING/FALLING
-	fall = false;
-
-	if (!x) {
-		if (groundCollide) {
-			bottom = true;
-		}
-		else {
-			enableEffect = true;
-			if (!jump) {
-				fall = true;
-			}
-		}
-	}
-
-	if (borderCollide && !x && jump) {
-		jumpFall = true;
-	}
-
-
+	// DETECT GROUND COL SIDE
 	if (groundCollide) {
-		if (x) {
-			//REMOVE LEFT SIDE GAP
-			if (heroPos.x + heroSize.x <= groundPos[i].x) {
-				heroPos.x = groundPos[i].x - heroSize.x;
-			}
 
-			//REMOVE RIGHT SIDE GAP
-			else if (heroPos.x >= groundPos[i].x + groundSize[i].x) {
-				heroPos.x = groundPos[i].x + groundSize[i].x;
-			}
+		// LEFT
+		if (heroPosTemp.x + heroSize.x <= groundPos[i].x) {
+			heroPos.x = groundPos[i].x - heroSize.x;
+			groundColX = true;
 		}
 
-		else {
-			//REMOVE BOTTOM GAP
-			if (heroPos.y + heroSize.y <= groundPos[i].y) {
-				heroPos.y = groundPos[i].y - heroSize.y;
-				if (jump) { jump = false; jumpFall = false; }
-			}
-
-			//REMOVE TOP GAP AND STOP JUMP
-			else if (heroPos.y >= groundPos[i].y + groundSize[i].y) {
-				heroPos.y = groundPos[i].y + groundSize[i].y;
-				if (jump) { jumpFall = true; }
-			}
+		// RIGHT
+		else if (heroPosTemp.x >= groundPos[i].x + groundSize[i].x) {
+			heroPos.x = groundPos[i].x + groundSize[i].x;
+			groundColX = true;
 		}
+
+		// TOP
+		else if (heroPosTemp.y + heroSize.y <= groundPos[i].y) {
+			heroPos.y = groundPos[i].y - heroSize.y;
+
+			bottom = true;
+			if (jump) { jump = false; jumpFall = false; }
+		}
+
+		// BOTTOM
+		else if (heroPosTemp.y >= groundPos[i].y + groundSize[i].y) {
+			heroPos.y = groundPos[i].y + groundSize[i].y;
+
+			if (jump) { jumpFall = true; }
+		}
+	}
+
+	else {
+		enableEffect = true;
+	}
+
+
+
+	if (borderCollide) {
+		heroPos.x = heroPosTemp.x;
 	}
 }
 
@@ -454,21 +453,30 @@ void Game::collision(int& i) {
 
 	groundCollide = false;
 	borderCollide = false;
+	enemyCollide = false;
 
-	//BORDER HIT
+
+	//BORDER COL
 	if (heroPos.x < 0 || heroPos.x + heroSize.x > width || heroPos.y < 0) {
 		borderCollide = true;
+
+		if (heroPos.y < 0) { jumpFall = true; }
 	}
 
 	if (heroPos.y + heroSize.y > height) {
 		restart = true;
 	}
 
-	//GROUND HIT
+
+	//ENEMY COL
+	for (i = 0; i <= 3; i++) {
+		enemyCollide = collision.check(heroPos, enemyPos[i], heroSize, enemySize);
+		if (enemyCollide) { enemyHitNo = i; break; }
+	}
+
+	//GROUND COL
 	for (i = 0; i < groundNo; i++) {
-		if (collision.check(heroPos, groundPos[i], heroSize, groundSize[i])) {
-			groundCollide = true;
-		}
+		groundCollide = collision.check(heroPos, groundPos[i], heroSize, groundSize[i]);
 		if (groundCollide) { break; }
 	}
 }
@@ -483,7 +491,6 @@ bool Collision::check(Vector2f firstPos, Vector2f secondPos, Vector2f firstSize,
 
 	return collide;
 }
-
 
 void Game::effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52]) {
 	int gapx = 0;
@@ -518,8 +525,7 @@ void Game::effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52
 
 void Game::breathing() {
 
-	//BREATH IF STANDING ELSE REVERT SIZE TO ORIGIN IF JUMPING OR FALLING
-	if (bottom || (breathingOrder == -1 && (jump || fall))) {
+	if (bottom || (breathingOrder == -1 && (jump || (!bottom && !jump)))) {
 		if (jump || frame % 30 == 0) {
 			heroSize.y -= 5 * breathingOrder;
 			heroPos.y += 5 * breathingOrder;
@@ -529,11 +535,41 @@ void Game::breathing() {
 	}
 }
 
+void Game::enemyHit() {
+
+	if (enemyCollide) {
+		if (heroPosTemp.y > enemyPos[enemyHitNo].y) {
+			heroEnemyJump = true;
+		}
+
+		else {
+			heroLoseHealth = true;
+		}
+
+		enemyRemove[enemyHitNo] = true;
+	}
+
+	if (enemyCollide) {
+	}
+}
+
 void Game::setPositions() {
 	heroMask.setPosition(heroPos);
 	hero.setPosition(heroPos);
 }
 
+void Game::frames() {
+	frame++;
+
+	//RESET FRAME
+	if (frame == 99999) {
+		tempFrame = 0 - frame - tempFrame;
+		for (int i = 0; i <= 3; i++) {
+			if (enemyWait[i]) { enemyFrameTemp[i] -= frame; }
+		}
+		frame = 0;
+	}
+}
 
 Game::Game() {
 	RectangleShape heroEffect[52];
@@ -545,16 +581,14 @@ Game::Game() {
 	setWindow();
 
 
+
 	while (window.isOpen())
 	{
+
+
 		// EVENTS
 
 		events();
-
-
-		if (restart) {
-			Restart();
-		}
 
 
 		// PHYSICS
@@ -567,21 +601,19 @@ Game::Game() {
 
 			effectUpdate(heroEffect, heroEffectPos);
 
+			enemyHit();
+
 			setPositions();
 
-
-			frame++;
-
-			//RESET FRAME
-			if (frame == 99999) {
-				tempFrame = 0 - frame - tempFrame;
-				for (int i = 0; i <= 3; i++) {
-					if (enemyWait[i]) { enemyFrameTemp[i] -= frame; }
-				}
-				frame = 0;
-			}
+			frames();
 		}
 
+
+		// RESTART
+
+		if (restart) {
+			Restart();
+		}
 
 
 		// DISPLAY
@@ -641,12 +673,18 @@ TO DO LIST :
 
 WORKING ORDER:
 	CHECK KEY INPUT: OTHERS, MOVEMENT
+
 	ENEMY PHYSICS
 	ADD MOVEMENT/JUMP/FALL
+
 	CHECK COLLISION: X, Y
 	APPLY MOVEMENT
+
+	ENEMY HIT
 	BREATH
 	UPDATE EFFECT
+
 	SET POSITION
+
 	DRAW
 */
