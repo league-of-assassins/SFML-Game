@@ -16,7 +16,7 @@ public:
 class Game {
 private:
 
-	int unsigned width = 0, height = 0;
+	int unsigned width, height;
 	RenderWindow window;
 	int frame = 0, tempFrame = 0;
 
@@ -46,6 +46,12 @@ private:
 	int breathingOrder = 1;
 
 
+	RectangleShape enemy[4];
+	Vector2f enemyPos[4];
+	Vector2f enemySize;
+
+	int enemySpeed = 5, enemyFrameTemp[4] = {0, 120, 0, 300}, enemyRight[4] = { 1, -1, 1, -1 };
+	bool enemyWait[4] = { false, true, false, true };
 
 	RectangleShape ground[12];
 	Vector2f groundPos[12];
@@ -81,6 +87,8 @@ public:
 	void events();
 
 	void Restart();
+
+	void enemyPhysics();
 
 	void moveHeroKey();
 
@@ -163,6 +171,23 @@ void Game::objects(RectangleShape heroEffect[52]) {
 		heroEffect[i].setFillColor(Color(i * 4, 0, 150, (255 - i * 5) * m));
 	}
 
+	// ENEMY
+	enemySize.x = 50;
+	enemySize.y = 25;
+	enemy[0].setSize(enemySize);
+	enemy[0].setFillColor(Color::Red);
+	enemyPos[0].x = 0 - enemySize.x; 
+	enemyPos[0].y = 200;
+	enemy[0].setPosition(enemyPos[0]);
+
+	for (int i = 1; i <= 3; i++) {
+		enemy[i] = enemy[0];
+		enemyPos[i].x = enemyPos[0].x;
+		enemyPos[i].y = enemyPos[0].y + i * 150;
+		enemy[i].setPosition(enemyPos[i]);
+	}
+
+
 
 	// GROUND
 	string tempS;
@@ -233,7 +258,34 @@ void Game::Restart() {
 	effectStart = -1;
 	heroPos.x = 300;
 	heroPos.y = 0;
+}
 
+void Game::enemyPhysics() {
+	int temp = 200;
+
+	for (int i = 0; i < 4; i++) {
+
+		if (!enemyWait[i]) {
+			enemyPos[i].x += enemySpeed * enemyRight[i];
+
+			if (enemyPos[i].x < 0 - enemySize.x || enemyPos[i].x > width) {
+				enemyFrameTemp[i] = frame + 60 + rand() % 300;;
+				enemyWait[i] = true;
+			}
+
+			enemy[i].setPosition(enemyPos[i]);
+		}
+
+		else if (frame == enemyFrameTemp[i]) {
+			enemyPos[i].x = (enemyRight[i] + 1) / 2 * width;
+			enemyPos[i].y = temp + i*135 + rand() % 80;
+			temp = 0;
+			enemyRight[i] *= -1;
+			enemyWait[i] = false;
+		}
+
+
+	}
 }
 
 void Game::moveHeroKey() {
@@ -509,6 +561,8 @@ Game::Game() {
 
 		if (!over && !pause) {
 
+			enemyPhysics();
+
 			physics();
 
 			effectUpdate(heroEffect, heroEffectPos);
@@ -517,8 +571,14 @@ Game::Game() {
 
 
 			frame++;
+
+			//RESET FRAME
 			if (frame == 99999) {
-				tempFrame = 0 - frame - tempFrame; frame = 0;
+				tempFrame = 0 - frame - tempFrame;
+				for (int i = 0; i <= 3; i++) {
+					if (enemyWait[i]) { enemyFrameTemp[i] -= frame; }
+				}
+				frame = 0;
 			}
 		}
 
@@ -549,6 +609,10 @@ void Game::displays(RectangleShape heroEffect[52]) {
 		}
 		window.draw(hero);
 		window.draw(heroMask);
+
+		for (int i = 0; i < 4; i++) {
+			window.draw(enemy[i]);
+		}
 	}
 
 	else {
@@ -577,6 +641,7 @@ TO DO LIST :
 
 WORKING ORDER:
 	CHECK KEY INPUT: OTHERS, MOVEMENT
+	ENEMY PHYSICS
 	ADD MOVEMENT/JUMP/FALL
 	CHECK COLLISION: X, Y
 	APPLY MOVEMENT
