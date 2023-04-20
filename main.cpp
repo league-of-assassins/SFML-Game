@@ -45,17 +45,22 @@ private:
 
 	int heroEffectSize = 25, heroEffectCount = 52, effectStart = -1;
 	int breathingOrder = 1;
-	bool heroEnemyJump = false, heroLoseHealth = false;
+	bool heroEnemyJump = false;
+
+
+
+	RectangleShape health[3];
+	int healthCount = 3;
+
 
 
 	RectangleShape enemy[4];
 	Vector2f enemyPos[4];
 	Vector2f enemySize;
 
-	int enemySpeed = 5, enemyFrameTemp[4] = { 0, 120, 0, 300 }, enemyRight[4] = { 1, -1, 1, -1 };
+	int enemySpeed = 5, enemyFrameTemp[4] = { 60, 120, 0, 300 }, enemyRight[4] = { -1, -1, 1, -1 };
 	int enemyHitNo = 0;
 	bool enemyCollide = false;
-	bool enemyRemove[4] = { false };
 	bool enemyWait[4] = { false, true, false, true };
 
 	RectangleShape ground[12];
@@ -65,14 +70,13 @@ private:
 	Text textGr[12];
 
 	int groundPosArr[12][2] = {
-		{ 450, 600 }, { 650, 760 }, { 160, 490 },
-		{ 1280, 300 }, { 250, 730 }, { 1500, 470 },
-		{ 950, 640 }, { 950, 400 }, { 700, 490 },
-		{ 1230, 550 }, { 450, 330 }, { 1600, 180 }
+		{ 1600, 180 }, { 450, 310 }, { 1260, 310 },
+		{ 950, 400 }, { 160, 480 }, { 1460, 470 },
+		{700, 480 }, { 410, 570  }, { 1200, 570 },
+		{ 960, 640 }, { 670, 760 }, { 250, 760 }
 	};
 
 	int groundNo = 12;
-
 
 
 
@@ -126,7 +130,7 @@ public:
 
 
 void Game::setWindow() {
-	width = VideoMode::getDesktopMode().width - 100;
+	width = VideoMode::getDesktopMode().width;
 	height = VideoMode::getDesktopMode().height;
 
 	window.create(VideoMode(width, height), "SFML Game", Style::None);
@@ -182,6 +186,18 @@ void Game::objects(RectangleShape heroEffect[52]) {
 		heroEffect[i].setFillColor(Color(i * 4, 0, 150, (255 - i * 5) * m));
 	}
 
+
+	//HEALTH
+	health[0].setSize(Vector2f(25, 25));
+	health[0].setFillColor(Color::Red);
+	health[0].setRotation(45);
+	
+	for (int i = 0; i <= 2; i++) {
+		health[i] = health[0];
+		health[i].setPosition(1800 - i*50, 50);
+	}
+
+
 	// ENEMY
 	enemySize.x = 50;
 	enemySize.y = 25;
@@ -197,7 +213,6 @@ void Game::objects(RectangleShape heroEffect[52]) {
 		enemyPos[i].y = enemyPos[0].y + i * 150;
 		enemy[i].setPosition(enemyPos[i]);
 	}
-
 
 
 	// GROUND
@@ -258,12 +273,6 @@ void Game::Restart() {
 	over = false;
 	restart = false;
 
-	if (jump) {
-		jump = false; jumpFall = false;
-		frame = 0; tempFrame = 0;
-	}
-
-
 	int baseLength = 200;
 
 	effectStart = -1;
@@ -272,15 +281,14 @@ void Game::Restart() {
 }
 
 void Game::enemyPhysics() {
-	int temp = 200;
 
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i <= 3; i++) {
 
 		if (!enemyWait[i]) {
 			enemyPos[i].x += enemySpeed * enemyRight[i];
 
 			if (enemyPos[i].x < 0 - enemySize.x || enemyPos[i].x > width) {
-				enemyFrameTemp[i] = frame + 60 + rand() % 300;;
+				enemyFrameTemp[i] = frame + 60 + rand() % 60;
 				enemyWait[i] = true;
 			}
 
@@ -288,14 +296,10 @@ void Game::enemyPhysics() {
 		}
 
 		else if (frame == enemyFrameTemp[i]) {
-			enemyPos[i].x = (enemyRight[i] + 1) / 2 * width;
-			enemyPos[i].y = temp + i * 135 + rand() % 80;
-			temp = 0;
+			enemyPos[i].y = groundPosArr[i*3 + rand()%((i+1)*3)][1] - (50 + enemySize.y + 15 * (rand()%1));
 			enemyRight[i] *= -1;
 			enemyWait[i] = false;
 		}
-
-
 	}
 }
 
@@ -317,10 +321,13 @@ void Game::moveHeroKey() {
 		left = true;
 	}
 
-	if (Keyboard::isKeyPressed(Keyboard::W) && !jump && !sit && bottom) {
+	if ((Keyboard::isKeyPressed(Keyboard::W) && !jump && !sit && bottom) || heroEnemyJump) {
 		jump = true;
+		jumpFall = false;
 		tempFrame = frame;
 		speed = 4;
+
+		if (heroEnemyJump) { heroEnemyJump = false; }
 	}
 
 	else if (Keyboard::isKeyPressed(Keyboard::S) && bottom) {
@@ -334,17 +341,23 @@ void Game::moveHeroKey() {
 }
 
 void Game::jumping() {
-	if (!jumpFall && (frame - tempFrame) == 40) {
-		jumpFall = true;
+	if (jump) {
+		if (!jumpFall && (frame - tempFrame) == 40) {
+			jumpFall = true;
+		}
+
+		if (!jumpFall) {
+			yVelo = -7;
+			speed += 0.1;
+		}
+
+		else if (speed > 5) {
+			speed -= 0.1;
+		}
 	}
 
-	if (!jumpFall) {
-		yVelo = -7;
-		speed += 0.1;
-	}
-
-	else if (speed > 5) {
-		speed -= 0.1;
+	else {
+		speed = 7;
 	}
 }
 
@@ -380,10 +393,7 @@ void Game::physics() {
 
 
 	//JUMP
-	if (jump) {
-		jumping();
-	}
-	else { speed = 7; }
+	jumping();
 
 
 	//check collision
@@ -404,7 +414,35 @@ void Game::askMove(int xVelo, int yVelo) {
 	heroPos.y += yVelo;
 
 	collision(i);
+}
 
+void Game::collision(int& i) {
+	Collision collision;
+
+	groundCollide = false;
+	borderCollide = false;
+	enemyCollide = false;
+
+
+	//BORDER COL
+	if (heroPos.x < 0 || heroPos.x + heroSize.x > width || heroPos.y < 0) {
+		borderCollide = true;
+
+		heroPos.x = heroPosTemp.x;
+
+		if (heroPos.y < 0) { jumpFall = true; }
+	}
+
+	if (heroPos.y + heroSize.y > height) {
+		restart = true;
+	}
+
+
+	//GROUND COL
+	for (i = 0; i < groundNo; i++) {
+		groundCollide = collision.check(heroPos, groundPos[i], heroSize, groundSize[i]);
+		if (groundCollide) { break; }
+	}
 
 	// DETECT GROUND COL SIDE
 	if (groundCollide) {
@@ -437,36 +475,6 @@ void Game::askMove(int xVelo, int yVelo) {
 		}
 	}
 
-	else {
-		enableEffect = true;
-	}
-
-
-
-	if (borderCollide) {
-		heroPos.x = heroPosTemp.x;
-	}
-}
-
-void Game::collision(int& i) {
-	Collision collision;
-
-	groundCollide = false;
-	borderCollide = false;
-	enemyCollide = false;
-
-
-	//BORDER COL
-	if (heroPos.x < 0 || heroPos.x + heroSize.x > width || heroPos.y < 0) {
-		borderCollide = true;
-
-		if (heroPos.y < 0) { jumpFall = true; }
-	}
-
-	if (heroPos.y + heroSize.y > height) {
-		restart = true;
-	}
-
 
 	//ENEMY COL
 	for (i = 0; i <= 3; i++) {
@@ -474,11 +482,6 @@ void Game::collision(int& i) {
 		if (enemyCollide) { enemyHitNo = i; break; }
 	}
 
-	//GROUND COL
-	for (i = 0; i < groundNo; i++) {
-		groundCollide = collision.check(heroPos, groundPos[i], heroSize, groundSize[i]);
-		if (groundCollide) { break; }
-	}
 }
 
 bool Collision::check(Vector2f firstPos, Vector2f secondPos, Vector2f firstSize, Vector2f secondSize) {
@@ -493,21 +496,22 @@ bool Collision::check(Vector2f firstPos, Vector2f secondPos, Vector2f firstSize,
 }
 
 void Game::effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52]) {
-	int gapx = 0;
+	int gap = 3;
 	int n = -1;
 
-	//MAKE EFFECT FOLLOW THE PREVIOUS
+	if (!groundCollide) { enableEffect = true; }
 
+	//MAKE EFFECT FOLLOW THE PREVIOUS
 	if (enableEffect) { if (effectStart < 51) { effectStart += 2; } }
 	else if (effectStart > -1) { effectStart -= 2; }
 
 	if (effectStart > -1) {
 
 		for (int i = 0; i <= 1; i++) {
-			heroEffectPos[i].x = heroPos.x + heroSize.x / 2 + gapx;
-			heroEffectPos[i].y = heroPos.y + heroSize.y / 2 - gapx;
+			heroEffectPos[i].x = heroPos.x + heroSize.x / 2 + gap;
+			heroEffectPos[i].y = heroPos.y + heroSize.y / 2 - gap;
 			heroEffect[i].setPosition(heroEffectPos[i]);
-			gapx *= -1;
+			gap *= -1;
 		}
 
 		if (effectStart > 1) {
@@ -538,18 +542,22 @@ void Game::breathing() {
 void Game::enemyHit() {
 
 	if (enemyCollide) {
-		if (heroPosTemp.y > enemyPos[enemyHitNo].y) {
+
+		if (heroPosTemp.y + heroSize.y < enemyPos[enemyHitNo].y) {
 			heroEnemyJump = true;
 		}
 
 		else {
-			heroLoseHealth = true;
+			healthCount--;
+			restart = true;
+
+			if (healthCount == 0) {
+				healthCount = 3;
+			}
 		}
-
-		enemyRemove[enemyHitNo] = true;
-	}
-
-	if (enemyCollide) {
+		
+		int temp = (enemyRight[enemyHitNo] + 1) / 2 * (width + 50) - 50;
+		enemyPos[enemyHitNo].x = temp;
 	}
 }
 
@@ -629,6 +637,10 @@ void Game::displays(RectangleShape heroEffect[52]) {
 	window.clear();
 
 	if (!over) {
+		for (int i = 0; i < healthCount; i++) {
+			window.draw(health[i]);
+		}
+
 		if (effectStart > -1) {
 			for (int i = effectStart; i >= 0; i--) {
 				window.draw(heroEffect[i]);
@@ -665,26 +677,3 @@ int main()
 
 	return 0;
 }
-
-/*
-TO DO LIST :
-	ADD ENEMIES
-	ADJUST JUMPING PHYSICS
-
-WORKING ORDER:
-	CHECK KEY INPUT: OTHERS, MOVEMENT
-
-	ENEMY PHYSICS
-	ADD MOVEMENT/JUMP/FALL
-
-	CHECK COLLISION: X, Y
-	APPLY MOVEMENT
-
-	ENEMY HIT
-	BREATH
-	UPDATE EFFECT
-
-	SET POSITION
-
-	DRAW
-*/
