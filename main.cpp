@@ -28,8 +28,6 @@ private:
 	Sprite gameOver;
 	Texture texture_gameOver;
 
-
-
 	Sprite heroMask;
 	Texture texture_heroMask;
 
@@ -78,9 +76,12 @@ private:
 
 	int groundNo = 12;
 
+	Vector2f rainPos[100];
+	int rainCount = 100;
 
 
-	bool sit = false, jump = false, jumpFall = false, bottom = false,
+
+	bool sit = false, jump = false, jumpFall = false, safeFall = false, heroBlink = false, bottom = false,
 		groundColX = false, releasedS = true, right = false, left = false, enableEffect = false;
 	bool over = false, restart = true, pause = false, groundCollide = false, borderCollide = false;
 
@@ -92,7 +93,7 @@ public:
 
 	void textures();
 
-	void objects(RectangleShape heroEffect[52]);
+	void objects(RectangleShape heroEffect[52], RectangleShape rain[100]);
 
 	void events();
 
@@ -112,6 +113,8 @@ public:
 
 	void effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52]);
 
+	void rains(RectangleShape rain[100]);
+
 	void breathing();
 
 	void enemyHit();
@@ -120,7 +123,7 @@ public:
 
 	void frames();
 
-	void displays(RectangleShape heroEffect[52]);
+	void displays(RectangleShape heroEffect[52], RectangleShape rain[100]);
 
 	Game();
 
@@ -151,7 +154,6 @@ void Game::textures() {
 		return;
 	}
 	gameOver.setTexture(texture_gameOver);
-	gameOver.setPosition(Vector2f(-450, 0));
 
 	if (!texture_heroMask.loadFromFile("resources\\images\\ninja head.png")) {
 		cout << "\n\t Texture mask not found\n";
@@ -160,7 +162,7 @@ void Game::textures() {
 	heroMask.setTexture(texture_heroMask);
 }
 
-void Game::objects(RectangleShape heroEffect[52]) {
+void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100]) {
 
 	// HERO
 	heroSize.x = 50; heroSize.y = 80;
@@ -218,8 +220,6 @@ void Game::objects(RectangleShape heroEffect[52]) {
 	// GROUND
 	string tempS;
 	for (int i = 0; i < groundNo; i++) {
-		ground[i].setFillColor(Color::White);
-
 		groundSize[i].x = 130 + i % 4 * 20;
 		groundSize[i].y = 45;
 		ground[i].setSize(groundSize[i]);
@@ -233,6 +233,16 @@ void Game::objects(RectangleShape heroEffect[52]) {
 		tempS = to_string(i + 1);
 		textGr[i].setString(tempS);
 		textGr[i].setPosition(Vector2f(groundPos[i].x + 10, groundPos[i].y - 5));
+	}
+
+
+	// RAIN
+	for (int i = 0; i < rainCount; i++) {
+		rain[i].setSize(Vector2f(1, 7));
+		
+		rainPos[i].x = rand() % width;
+		rainPos[i].y = rand() % height;
+		rain[i].setPosition(rainPos[i]);
 	}
 }
 
@@ -270,14 +280,20 @@ void Game::events() {
 }
 
 void Game::Restart() {
-	over = false;
+	if (over) {
+		over = false;
+		healthCount = 3;
+	}
 	restart = false;
-
-	int baseLength = 200;
+	safeFall = true;
 
 	effectStart = -1;
 	heroPos.x = 300;
 	heroPos.y = 0;
+
+	if (healthCount == 0) {
+		over = true;
+	}
 }
 
 void Game::enemyPhysics() {
@@ -434,6 +450,7 @@ void Game::collision(int& i) {
 	}
 
 	if (heroPos.y + heroSize.y > height) {
+		healthCount--;
 		restart = true;
 	}
 
@@ -464,6 +481,7 @@ void Game::collision(int& i) {
 			heroPos.y = groundPos[i].y - heroSize.y;
 
 			bottom = true;
+			if (safeFall) { safeFall = false; heroBlink = false; }
 			if (jump) { jump = false; jumpFall = false; }
 		}
 
@@ -477,9 +495,11 @@ void Game::collision(int& i) {
 
 
 	//ENEMY COL
-	for (i = 0; i <= 3; i++) {
-		enemyCollide = collision.check(heroPos, enemyPos[i], heroSize, enemySize);
-		if (enemyCollide) { enemyHitNo = i; break; }
+	if (!safeFall) {
+		for (i = 0; i <= 3; i++) {
+			enemyCollide = collision.check(heroPos, enemyPos[i], heroSize, enemySize);
+			if (enemyCollide) { enemyHitNo = i; break; }
+		}
 	}
 
 }
@@ -525,6 +545,11 @@ void Game::effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52
 			}
 		}
 	}
+
+	if (safeFall && frame % 10 == 0) {
+		if (!heroBlink) { heroBlink = true; }
+		else { heroBlink = false; }
+	}
 }
 
 void Game::breathing() {
@@ -550,10 +575,6 @@ void Game::enemyHit() {
 		else {
 			healthCount--;
 			restart = true;
-
-			if (healthCount == 0) {
-				healthCount = 3;
-			}
 		}
 		
 		int temp = (enemyRight[enemyHitNo] + 1) / 2 * (width + 50) - 50;
@@ -579,14 +600,30 @@ void Game::frames() {
 	}
 }
 
+
+void Game::rains(RectangleShape rain[100]) {
+	for (int i = 0; i < rainCount; i++) {
+		rainPos[i].y += 5;
+		if (rainPos[i].y >= height) { rainPos[i].y = 0; }
+
+		rainPos[i].x += 2;
+		if (rainPos[i].x >= width) { rainPos[i].x = 0; }
+
+		rain[i].setPosition(rainPos[i]);
+	}
+
+}
+
 Game::Game() {
 	RectangleShape heroEffect[52];
 	Vector2f heroEffectPos[52];
 
+	RectangleShape rain[100];
+
+	setWindow();
 	fonts();
 	textures();
-	objects(heroEffect);
-	setWindow();
+	objects(heroEffect, rain);
 
 
 
@@ -607,9 +644,11 @@ Game::Game() {
 
 			physics();
 
+			enemyHit();
+
 			effectUpdate(heroEffect, heroEffectPos);
 
-			enemyHit();
+			rains(rain);
 
 			setPositions();
 
@@ -626,36 +665,43 @@ Game::Game() {
 
 		// DISPLAY
 
-		displays(heroEffect);
+		displays(heroEffect, rain);
 	}
 }
 
 Game::~Game() {}
 
-void Game::displays(RectangleShape heroEffect[52]) {
+void Game::displays(RectangleShape heroEffect[52], RectangleShape rain[100]) {
 
 	window.clear();
 
 	if (!over) {
+
+		for (int i = 0; i < rainCount; i++) {
+			window.draw(rain[i]);
+		}
+
 		for (int i = 0; i < healthCount; i++) {
 			window.draw(health[i]);
 		}
 
-		if (effectStart > -1) {
-			for (int i = effectStart; i >= 0; i--) {
-				window.draw(heroEffect[i]);
-			}
+		for (int i = 0; i < 4; i++) {
+			window.draw(enemy[i]);
 		}
 
 		for (int i = 0; i < groundNo; i++) {
 			window.draw(ground[i]);
 			window.draw(textGr[i]);
 		}
-		window.draw(hero);
-		window.draw(heroMask);
 
-		for (int i = 0; i < 4; i++) {
-			window.draw(enemy[i]);
+		if (!heroBlink) {
+			if (effectStart > -1) {
+				for (int i = effectStart; i >= 0; i--) {
+					window.draw(heroEffect[i]);
+				}
+			}
+			window.draw(hero);
+			window.draw(heroMask);
 		}
 	}
 
@@ -677,3 +723,8 @@ int main()
 
 	return 0;
 }
+
+/* Current bugs: 
+		Enemy collision
+
+*/
