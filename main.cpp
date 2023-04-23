@@ -19,7 +19,7 @@ private:
 
 	unsigned int width, height;
 	RenderWindow window;
-	int frame = 0, tempFrame = 0;
+	int frame = 0, jumpFrame = 0;
 
 	Event event;
 
@@ -41,6 +41,29 @@ private:
 
 
 
+	Vector2f mousePos;
+	bool mouseReleased = true;
+
+
+
+	RectangleShape gun;
+	Vector2f gunPos;
+	Vector2f gunSize;
+
+	double gunRotation = 0;
+
+
+
+	RectangleShape bullet;
+	Vector2f bulletPos;
+	Vector2f bulletSize;
+	Vector2f bulletVelo;
+
+	int bulletFrame = 0;
+	bool bulletFire = false, bulletActive = false;
+
+
+
 	int heroEffectSize = 25, heroEffectCount = 52, effectStart = -1;
 	int breathingOrder = 1;
 	bool heroEnemyJump = false;
@@ -56,7 +79,7 @@ private:
 	Vector2f enemyPos[4];
 	Vector2f enemySize;
 
-	int enemySpeed = 5, enemyFrameTemp[4] = { 60, 120, 0, 300 }, enemyRight[4] = { -1, -1, 1, -1 };
+	int enemySpeed = 5, enemySpawnFrame[4] = { 60, 120, 0, 300 }, enemyRight[4] = { -1, -1, 1, -1 };
 	int enemyHitNo = 0;
 	bool enemyCollide = false;
 	bool enemyWait[4] = { false, true, false, true };
@@ -76,7 +99,11 @@ private:
 
 	int groundNo = 12;
 
-	Vector2f rainPos[100];
+
+	RectangleShape terrain;
+	Vector2f terrainSize;
+
+
 	int rainCount = 100;
 
 
@@ -93,13 +120,19 @@ public:
 
 	void textures();
 
-	void objects(RectangleShape heroEffect[52], RectangleShape rain[100]);
+	void objects(RectangleShape heroEffect[52], RectangleShape rain[100], Vector2f rainPos[100]);
 
 	void events();
 
 	void Restart();
 
 	void enemyPhysics();
+
+	void mousep();
+
+	void gunp();
+
+	void bulletp(double x, double y);
 
 	void moveHeroKey();
 
@@ -113,7 +146,7 @@ public:
 
 	void effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52]);
 
-	void rains(RectangleShape rain[100]);
+	void rains(RectangleShape rain[100], Vector2f rainPos[100]);
 
 	void breathing();
 
@@ -133,7 +166,7 @@ public:
 
 
 void Game::setWindow() {
-	width = VideoMode::getDesktopMode().width;
+	width = VideoMode::getDesktopMode().width - 100;
 	height = VideoMode::getDesktopMode().height;
 
 	window.create(VideoMode(width, height), "SFML Game", Style::None);
@@ -162,7 +195,7 @@ void Game::textures() {
 	heroMask.setTexture(texture_heroMask);
 }
 
-void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100]) {
+void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100], Vector2f rainPos[100]) {
 
 	// HERO
 	heroSize.x = 50; heroSize.y = 80;
@@ -175,28 +208,43 @@ void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100]) {
 	heroMask.setScale(0.1, 0.1);
 	heroMask.setPosition(heroPos);
 
+	// HERO GUN
+	gunSize.x = 100;
+	gunSize.y = 20;
+	gun.setSize(gunSize);
+	gun.setFillColor(Color::Black);
+	gun.setOrigin(0, gunSize.y / 2);
+
+	// BULLET
+	bulletSize.x = 20;
+	bulletSize.y = 20;
+
+	bullet.setSize(bulletSize);
+	bullet.setFillColor(Color::Black);
+	bullet.setOrigin(bulletSize.x / 2, bulletSize.y / 2);
+
 
 	// HERO EFFECT
-	int m = 1;
+	int temp = 1;
 	for (int i = 0; i < heroEffectCount; i++) {
 		heroEffect[i].setOrigin(heroEffectSize / 2 - 2, heroEffectSize / 2 - 2);
 		heroEffect[i].setSize(Vector2f(heroEffectSize, heroEffectSize));
 
 		heroEffect[i].rotate(i * 15);
-		if (i > 10 && (i % 4 == 0 || i % 3 == 0)) { m = 0; }
-		else { m = 1; }
-		heroEffect[i].setFillColor(Color(i * 4, 0, 150, (255 - i * 5) * m));
+		if (i > 10 && (i % 4 == 0 || i % 3 == 0)) { temp = 0; }
+		else { temp = 1; }
+		heroEffect[i].setFillColor(Color(i * 4, 0, 150, (255 - i * 5) * temp));
 	}
 
 
 	//HEALTH
 	health[0].setSize(Vector2f(25, 25));
-	health[0].setFillColor(Color::Red);
+	health[0].setFillColor(Color::Black);
 	health[0].setRotation(45);
-	
+
 	for (int i = 0; i <= 2; i++) {
 		health[i] = health[0];
-		health[i].setPosition(1800 - i*50, 50);
+		health[i].setPosition(1800 - i * 50, 50);
 	}
 
 
@@ -223,6 +271,7 @@ void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100]) {
 		groundSize[i].x = 130 + i % 4 * 20;
 		groundSize[i].y = 45;
 		ground[i].setSize(groundSize[i]);
+		ground[i].setFillColor(Color::Black);
 
 		groundPos[i].x = groundPosArr[i][0];
 		groundPos[i].y = groundPosArr[i][1];
@@ -235,11 +284,20 @@ void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100]) {
 		textGr[i].setPosition(Vector2f(groundPos[i].x + 10, groundPos[i].y - 5));
 	}
 
+	// TERRAIN
+
+	terrainSize.x = width;
+	terrainSize.y = 50;
+	terrain.setSize(terrainSize);
+	terrain.setPosition(Vector2f(0, height - terrainSize.y));
+	terrain.setFillColor(Color::Black);
+
 
 	// RAIN
 	for (int i = 0; i < rainCount; i++) {
-		rain[i].setSize(Vector2f(1, 7));
-		
+		rain[i].setSize(Vector2f(1, 7 + rand() % 10));
+		rain[i].setFillColor(Color::Black);
+
 		rainPos[i].x = rand() % width;
 		rainPos[i].y = rand() % height;
 		rain[i].setPosition(rainPos[i]);
@@ -276,6 +334,14 @@ void Game::events() {
 		else if (event.type == Event::KeyReleased && event.key.code == Keyboard::S) {
 			releasedS = true;
 		}
+
+		else if (event.type == Event::MouseButtonReleased && event.mouseButton.button == Mouse::Left) {
+			mouseReleased = true;
+		}
+
+		else {
+			mousep();
+		}
 	}
 }
 
@@ -304,17 +370,104 @@ void Game::enemyPhysics() {
 			enemyPos[i].x += enemySpeed * enemyRight[i];
 
 			if (enemyPos[i].x < 0 - enemySize.x || enemyPos[i].x > width) {
-				enemyFrameTemp[i] = frame + 60 + rand() % 60;
+				enemySpawnFrame[i] = frame + 60 + rand() % 60;
 				enemyWait[i] = true;
 			}
 
 			enemy[i].setPosition(enemyPos[i]);
 		}
 
-		else if (frame == enemyFrameTemp[i]) {
-			enemyPos[i].y = groundPosArr[i*3 + rand()%((i+1)*3)][1] - (50 + enemySize.y + 15 * (rand()%1));
+		else if (frame == enemySpawnFrame[i]) {
+			enemyPos[i].y = groundPosArr[i * 3 + rand() % ((i + 1) * 3)][1] - (50 + enemySize.y + 15 * (rand() % 1));
 			enemyRight[i] *= -1;
 			enemyWait[i] = false;
+		}
+	}
+}
+
+void Game::mousep() {
+	mousePos.x = Mouse::getPosition().x;
+	mousePos.y = Mouse::getPosition().y;
+
+	if (event.type == Event::MouseButtonPressed && Mouse::isButtonPressed(Mouse::Left) && mouseReleased) {
+		bulletFire = true;
+		mouseReleased = false;
+	}
+}
+
+void Game::gunp() {
+
+	double x = mousePos.x - gunPos.x - gunSize.x / 2;
+	double y = mousePos.y - gunPos.y;
+
+	// BULLET PHYSICS
+	bulletp(x, y);
+
+
+	gunRotation = 0;
+
+	// HERO SIDE
+	if (x >= 0) {
+		right = true;
+	}
+
+	else { left = true; }
+
+
+	// GUN ROTATION
+
+	if (x < 0) {
+		gunRotation += 90;
+		if (y < 0) { gunRotation += 90; }
+	}
+	else if (y < 0) { gunRotation += 270; }
+
+	if ((x < 0 && y >= 0) || (x >= 0 && y < 0)) {
+		int temp = x;
+		x = y;
+		y = temp;
+	}
+
+	gunRotation += atan(abs(y) / abs(x)) * 180 / 3.1415;
+
+	gun.setRotation(gunRotation);
+}
+
+void Game::bulletp(double x, double y) {
+	if (bulletFire) {
+		if (!bulletActive) {
+
+			// FIND BULLET START POSITION
+			bulletPos = gunPos;
+
+			double tempB = sqrt(pow(x, 2) + pow(y, 2));
+
+			tempB = gunSize.x / tempB;
+
+			bulletPos.x += x * tempB;
+			bulletPos.y += y * tempB;
+
+			bulletVelo.x = x * tempB / 5;
+			bulletVelo.y = y * tempB / 5;
+
+			// REST
+			bullet.setPosition(bulletPos);
+
+			bulletActive = true;
+			bulletFrame = frame + 120;
+		}
+		bulletFire = false;
+	}
+
+	if (bulletActive) {
+		bulletPos.x += bulletVelo.x;
+		bulletPos.y += bulletVelo.y;
+
+		bullet.setPosition(bulletPos);
+
+
+		if (frame == bulletFrame) {
+			bulletActive = false;
 		}
 	}
 }
@@ -327,20 +480,18 @@ void Game::moveHeroKey() {
 		xVelo = speed;
 
 		enableEffect = true;
-		right = true;
 	}
 
 	else if (Keyboard::isKeyPressed(Keyboard::A)) {
 		xVelo = -speed;
 
 		enableEffect = true;
-		left = true;
 	}
 
 	if ((Keyboard::isKeyPressed(Keyboard::W) && !jump && !sit && bottom) || heroEnemyJump) {
 		jump = true;
 		jumpFall = false;
-		tempFrame = frame;
+		jumpFrame = frame + 40;
 		speed = 4;
 
 		if (heroEnemyJump) { heroEnemyJump = false; }
@@ -358,7 +509,7 @@ void Game::moveHeroKey() {
 
 void Game::jumping() {
 	if (jump) {
-		if (!jumpFall && (frame - tempFrame) == 40) {
+		if (!jumpFall && frame == jumpFrame) {
 			jumpFall = true;
 		}
 
@@ -379,9 +530,10 @@ void Game::jumping() {
 
 void Game::physics() {
 	xVelo = 0; yVelo = 7;
-
 	enableEffect = false;
 
+	//GUN PHYSICS
+	gunp();
 
 	//DISABLE SIT
 	if (sit && releasedS) {
@@ -392,30 +544,16 @@ void Game::physics() {
 		yVelo = 0;
 	}
 
+	//MOVE KEY INPUT
 	moveHeroKey();
-
-	//SET MASK SIDE
-	if (right) {
-		heroMask.setScale(-0.1, 0.1);
-		heroMask.setOrigin(500, 0);
-		right = false;
-	}
-
-	else if (left) {
-		heroMask.setScale(0.1, 0.1);
-		heroMask.setOrigin(0, 0);
-		left = false;
-	}
-
 
 	//JUMP
 	jumping();
 
-
-	//check collision
+	//APPROVE MOVEMENT
 	askMove(xVelo, yVelo);
 
-
+	//BREATHE
 	breathing();
 }
 
@@ -449,7 +587,7 @@ void Game::collision(int& i) {
 		if (heroPos.y < 0) { jumpFall = true; }
 	}
 
-	if (heroPos.y + heroSize.y > height) {
+	if (heroPos.y + heroSize.y > height - terrainSize.y) {
 		healthCount--;
 		restart = true;
 	}
@@ -519,9 +657,10 @@ void Game::effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52
 	int gap = 3;
 	int n = -1;
 
-	if (!groundCollide) { enableEffect = true; }
 
 	//MAKE EFFECT FOLLOW THE PREVIOUS
+	if (!groundCollide) { enableEffect = true; }
+
 	if (enableEffect) { if (effectStart < 51) { effectStart += 2; } }
 	else if (effectStart > -1) { effectStart -= 2; }
 
@@ -546,9 +685,23 @@ void Game::effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52
 		}
 	}
 
+	// SAFE FALL
 	if (safeFall && frame % 10 == 0) {
 		if (!heroBlink) { heroBlink = true; }
 		else { heroBlink = false; }
+	}
+
+	//SET MASK SIDE
+	if (right) {
+		heroMask.setScale(-0.1, 0.1);
+		heroMask.setOrigin(500, 0);
+		right = false;
+	}
+
+	else if (left) {
+		heroMask.setScale(0.1, 0.1);
+		heroMask.setOrigin(0, 0);
+		left = false;
 	}
 }
 
@@ -568,7 +721,7 @@ void Game::enemyHit() {
 
 	if (enemyCollide) {
 
-		if (heroPosTemp.y + heroSize.y < enemyPos[enemyHitNo].y) {
+		if (heroPosTemp.y + heroSize.y <= enemyPos[enemyHitNo].y) {
 			heroEnemyJump = true;
 		}
 
@@ -576,13 +729,17 @@ void Game::enemyHit() {
 			healthCount--;
 			restart = true;
 		}
-		
+
+		// IS BUGGED FOR SOME REASON. ENEMIES DONT SPAWN AFTER A WHILE IF I DONT PASS THE VALUE TO TEMP FIRST. MAYBE DECIMALS ARE BREAKING THE CALCULATION
 		int temp = (enemyRight[enemyHitNo] + 1) / 2 * (width + 50) - 50;
 		enemyPos[enemyHitNo].x = temp;
 	}
 }
 
 void Game::setPositions() {
+	gunPos.x = heroPos.x + heroSize.x / 2;
+	gunPos.y = heroPos.y + heroSize.y / 2 + gunSize.y / 2;
+	gun.setPosition(gunPos);
 	heroMask.setPosition(heroPos);
 	hero.setPosition(heroPos);
 }
@@ -592,16 +749,19 @@ void Game::frames() {
 
 	//RESET FRAME
 	if (frame == 99999) {
-		tempFrame = 0 - frame - tempFrame;
+		jumpFrame -= frame;
+
+		if (bulletActive) { bulletFrame -= frame; }
+
 		for (int i = 0; i <= 3; i++) {
-			if (enemyWait[i]) { enemyFrameTemp[i] -= frame; }
+			if (enemyWait[i]) { enemySpawnFrame[i] -= frame; }
 		}
 		frame = 0;
 	}
 }
 
 
-void Game::rains(RectangleShape rain[100]) {
+void Game::rains(RectangleShape rain[100], Vector2f rainPos[100]) {
 	for (int i = 0; i < rainCount; i++) {
 		rainPos[i].y += 5;
 		if (rainPos[i].y >= height) { rainPos[i].y = 0; }
@@ -619,11 +779,12 @@ Game::Game() {
 	Vector2f heroEffectPos[52];
 
 	RectangleShape rain[100];
+	Vector2f rainPos[100];
 
 	setWindow();
 	fonts();
 	textures();
-	objects(heroEffect, rain);
+	objects(heroEffect, rain, rainPos);
 
 
 
@@ -648,7 +809,7 @@ Game::Game() {
 
 			effectUpdate(heroEffect, heroEffectPos);
 
-			rains(rain);
+			rains(rain, rainPos);
 
 			setPositions();
 
@@ -673,13 +834,15 @@ Game::~Game() {}
 
 void Game::displays(RectangleShape heroEffect[52], RectangleShape rain[100]) {
 
-	window.clear();
+	window.clear(Color::White);
 
 	if (!over) {
 
 		for (int i = 0; i < rainCount; i++) {
 			window.draw(rain[i]);
 		}
+
+		window.draw(terrain);
 
 		for (int i = 0; i < healthCount; i++) {
 			window.draw(health[i]);
@@ -700,8 +863,14 @@ void Game::displays(RectangleShape heroEffect[52], RectangleShape rain[100]) {
 					window.draw(heroEffect[i]);
 				}
 			}
+
 			window.draw(hero);
 			window.draw(heroMask);
+			window.draw(gun);
+		}
+
+		if (bulletActive) {
+			window.draw(bullet);
 		}
 	}
 
@@ -724,7 +893,13 @@ int main()
 	return 0;
 }
 
-/* Current bugs: 
-		Enemy collision
+/*	CURRENT BUGS:
+		ENEMY POSITIONS
 
+	TO DO:
+		ADD FALLING OBJECTS WHICH YOU CAN SHOOT WITH YOUR WEAPON
+		DROP HEALTH ITEM WITH LUCK IF ENEMY HIT
+		ADD BULLET FIRE ANIMATION
+		CHANGE ENEMY SPRITE
+		CHANGE GUN & BULLET SPRITE
 */
