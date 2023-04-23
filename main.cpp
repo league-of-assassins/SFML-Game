@@ -166,7 +166,7 @@ public:
 
 
 void Game::setWindow() {
-	width = VideoMode::getDesktopMode().width - 100;
+	width = VideoMode::getDesktopMode().width;
 	height = VideoMode::getDesktopMode().height;
 
 	window.create(VideoMode(width, height), "SFML Game", Style::None);
@@ -200,9 +200,12 @@ void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100], Vect
 	// HERO
 	heroSize.x = 50; heroSize.y = 80;
 	hero.setSize(heroSize);
-	hero.setFillColor(Color::Cyan);
+	hero.setFillColor(Color::Black);
 	heroPos.x = 25; heroPos.y = 25;
 	hero.setPosition(heroPos);
+
+	hero.setOutlineThickness(-1);
+	hero.setOutlineColor(Color::Cyan);
 
 	// HERO MASK
 	heroMask.setScale(0.1, 0.1);
@@ -215,6 +218,10 @@ void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100], Vect
 	gun.setFillColor(Color::Black);
 	gun.setOrigin(0, gunSize.y / 2);
 
+	gun.setOutlineThickness(-1);
+	gun.setOutlineColor(Color::Red);
+
+
 	// BULLET
 	bulletSize.x = 20;
 	bulletSize.y = 20;
@@ -222,6 +229,8 @@ void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100], Vect
 	bullet.setSize(bulletSize);
 	bullet.setFillColor(Color::Black);
 	bullet.setOrigin(bulletSize.x / 2, bulletSize.y / 2);
+	bullet.setOutlineThickness(-3);
+	bullet.setOutlineColor(Color::Cyan);
 
 
 	// HERO EFFECT
@@ -353,9 +362,18 @@ void Game::Restart() {
 	restart = false;
 	safeFall = true;
 
+	//RESET HERO
 	effectStart = -1;
 	heroPos.x = 300;
 	heroPos.y = 0;
+
+	// RESET BULLET
+	if (bulletActive || bulletFire) {
+		bulletFire = false;
+		bulletActive = false;
+		bulletPos.x = -100;
+		bulletPos.y = -100;
+	}
 
 	if (healthCount == 0) {
 		over = true;
@@ -468,6 +486,8 @@ void Game::bulletp(double x, double y) {
 
 		if (frame == bulletFrame) {
 			bulletActive = false;
+			bulletPos.x = -100;
+			bulletPos.y = -100;
 		}
 	}
 }
