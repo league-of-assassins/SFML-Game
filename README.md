@@ -4,6 +4,7 @@ Basic game created by me for learning purposes using SFML library
 ![](/resources/images/preview.png)
 
 Key Inputs:
+	
 	Move: A, D
 	Jump: W
 	Sit: S
