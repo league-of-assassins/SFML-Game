@@ -84,6 +84,8 @@ private:
 	bool enemyCollide = false;
 	bool enemyWait[4] = { false, true, false, true };
 
+
+
 	RectangleShape ground[12];
 	Vector2f groundPos[12];
 	Vector2f groundSize[12];
@@ -93,15 +95,17 @@ private:
 	int groundPosArr[12][2] = {
 		{ 1600, 180 }, { 450, 310 }, { 1260, 310 },
 		{ 950, 400 }, { 160, 480 }, { 1460, 470 },
-		{700, 480 }, { 410, 570  }, { 1200, 570 },
+		{ 700, 480 }, { 410, 570  }, { 1200, 570 },
 		{ 960, 640 }, { 670, 760 }, { 250, 760 }
 	};
 
 	int groundNo = 12;
 
 
+
 	RectangleShape terrain;
 	Vector2f terrainSize;
+
 
 
 	int rainCount = 100;
@@ -128,17 +132,21 @@ public:
 
 	void enemyPhysics();
 
+	void enemyHit();
+
 	void mousep();
 
 	void gunp();
 
 	void bulletp(double x, double y);
 
+	void jumping();
+
+	void disableSit();
+
 	void moveHeroKey();
 
 	void physics();
-
-	void jumping();
 
 	void askMove(int xVelo, int yVelo);
 
@@ -149,8 +157,6 @@ public:
 	void rains(RectangleShape rain[100], Vector2f rainPos[100]);
 
 	void breathing();
-
-	void enemyHit();
 
 	void setPositions();
 
@@ -382,6 +388,7 @@ void Game::Restart() {
 
 void Game::enemyPhysics() {
 
+	// UPDATE ENEMY POSITION
 	for (int i = 0; i <= 3; i++) {
 
 		if (!enemyWait[i]) {
@@ -403,6 +410,24 @@ void Game::enemyPhysics() {
 	}
 }
 
+void Game::enemyHit() {
+
+	if (enemyCollide) {
+
+		if (heroPosTemp.y + heroSize.y <= enemyPos[enemyHitNo].y) {
+			heroEnemyJump = true;
+		}
+
+		else {
+			healthCount--;
+			restart = true;
+		}
+
+		int temp = (enemyRight[enemyHitNo] + 1) / 2 * (width + 50) - 50;
+		enemyPos[enemyHitNo].x = temp;
+	}
+}
+
 void Game::mousep() {
 	mousePos.x = Mouse::getPosition().x;
 	mousePos.y = Mouse::getPosition().y;
@@ -415,7 +440,7 @@ void Game::mousep() {
 
 void Game::gunp() {
 
-	double x = mousePos.x - gunPos.x - gunSize.x / 2;
+	double x = mousePos.x - gunPos.x;
 	double y = mousePos.y - gunPos.y;
 
 	// BULLET PHYSICS
@@ -492,6 +517,38 @@ void Game::bulletp(double x, double y) {
 	}
 }
 
+
+void Game::jumping() {
+	if (jump) {
+		if (!jumpFall && frame == jumpFrame) {
+			jumpFall = true;
+		}
+
+		if (!jumpFall) {
+			yVelo = -7;
+			speed += 0.1;
+		}
+
+		else if (speed > 5) {
+			speed -= 0.1;
+		}
+	}
+
+	else {
+		speed = 7;
+	}
+}
+
+void Game::disableSit() {
+	if (sit && releasedS) {
+		sit = false;
+		heroSize.y += 20;
+		heroPos.y -= 20;
+		hero.setSize(heroSize);
+		yVelo = 0;
+	}
+}
+
 void Game::moveHeroKey() {
 	xVelo = 0;
 
@@ -527,42 +584,18 @@ void Game::moveHeroKey() {
 	}
 }
 
-void Game::jumping() {
-	if (jump) {
-		if (!jumpFall && frame == jumpFrame) {
-			jumpFall = true;
-		}
-
-		if (!jumpFall) {
-			yVelo = -7;
-			speed += 0.1;
-		}
-
-		else if (speed > 5) {
-			speed -= 0.1;
-		}
-	}
-
-	else {
-		speed = 7;
-	}
-}
-
 void Game::physics() {
 	xVelo = 0; yVelo = 7;
 	enableEffect = false;
+
+	//ENEMY PHYSICS
+	enemyPhysics();
 
 	//GUN PHYSICS
 	gunp();
 
 	//DISABLE SIT
-	if (sit && releasedS) {
-		sit = false;
-		heroSize.y += 20;
-		heroPos.y -= 20;
-		hero.setSize(heroSize);
-		yVelo = 0;
-	}
+	disableSit();
 
 	//MOVE KEY INPUT
 	moveHeroKey();
@@ -659,7 +692,6 @@ void Game::collision(int& i) {
 			if (enemyCollide) { enemyHitNo = i; break; }
 		}
 	}
-
 }
 
 bool Collision::check(Vector2f firstPos, Vector2f secondPos, Vector2f firstSize, Vector2f secondSize) {
@@ -737,29 +769,11 @@ void Game::breathing() {
 	}
 }
 
-void Game::enemyHit() {
-
-	if (enemyCollide) {
-
-		if (heroPosTemp.y + heroSize.y <= enemyPos[enemyHitNo].y) {
-			heroEnemyJump = true;
-		}
-
-		else {
-			healthCount--;
-			restart = true;
-		}
-
-		// IS BUGGED FOR SOME REASON. ENEMIES DONT SPAWN AFTER A WHILE IF I DONT PASS THE VALUE TO TEMP FIRST. MAYBE DECIMALS ARE BREAKING THE CALCULATION
-		int temp = (enemyRight[enemyHitNo] + 1) / 2 * (width + 50) - 50;
-		enemyPos[enemyHitNo].x = temp;
-	}
-}
-
 void Game::setPositions() {
 	gunPos.x = heroPos.x + heroSize.x / 2;
 	gunPos.y = heroPos.y + heroSize.y / 2 + gunSize.y / 2;
 	gun.setPosition(gunPos);
+
 	heroMask.setPosition(heroPos);
 	hero.setPosition(heroPos);
 }
@@ -782,6 +796,8 @@ void Game::frames() {
 
 
 void Game::rains(RectangleShape rain[100], Vector2f rainPos[100]) {
+
+	//UPDATE RAIN POSITION
 	for (int i = 0; i < rainCount; i++) {
 		rainPos[i].y += 5;
 		if (rainPos[i].y >= height) { rainPos[i].y = 0; }
@@ -791,23 +807,24 @@ void Game::rains(RectangleShape rain[100], Vector2f rainPos[100]) {
 
 		rain[i].setPosition(rainPos[i]);
 	}
-
 }
 
 Game::Game() {
+	//LARGE VARS SET AS LOCAL
 	RectangleShape heroEffect[52];
 	Vector2f heroEffectPos[52];
 
 	RectangleShape rain[100];
 	Vector2f rainPos[100];
 
+	//INITIALIZERS
 	setWindow();
 	fonts();
 	textures();
 	objects(heroEffect, rain, rainPos);
 
 
-
+	// MAIN LOOP
 	while (window.isOpen())
 	{
 
@@ -817,15 +834,16 @@ Game::Game() {
 		events();
 
 
-		// PHYSICS
 
 		if (!over && !pause) {
 
-			enemyPhysics();
+			// PHYSICS
 
 			physics();
 
 			enemyHit();
+
+			// EFFECTS
 
 			effectUpdate(heroEffect, heroEffectPos);
 
@@ -854,8 +872,10 @@ Game::~Game() {}
 
 void Game::displays(RectangleShape heroEffect[52], RectangleShape rain[100]) {
 
+	//BACKGROUND COLOR
 	window.clear(Color::White);
 
+	//DRAW OBJECTS
 	if (!over) {
 
 		for (int i = 0; i < rainCount; i++) {
@@ -898,7 +918,7 @@ void Game::displays(RectangleShape heroEffect[52], RectangleShape rain[100]) {
 		window.draw(gameOver);
 	}
 
-
+	//DISPLAY THE OBJECTS
 	window.display();
 }
 
@@ -913,12 +933,11 @@ int main()
 	return 0;
 }
 
-/*	CURRENT BUGS:
-		ENEMY POSITIONS
-
+/*
 	TO DO:
 		ADD FALLING OBJECTS WHICH YOU CAN SHOOT WITH YOUR WEAPON
 		DROP HEALTH ITEM WITH LUCK IF ENEMY HIT
+		FIX ENEMY SPAWN POSITIONS
 		ADD BULLET FIRE ANIMATION
 		CHANGE ENEMY SPRITE
 		CHANGE GUN & BULLET SPRITE
