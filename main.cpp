@@ -1,6 +1,5 @@
 #include <SFML/Graphics.hpp>
 #include <iostream>
-#include <vector>
 
 using namespace std;
 using namespace sf;
@@ -51,16 +50,18 @@ private:
 	Vector2f gunSize;
 
 	double gunRotation = 0;
+	bool gunHide = false;
 
 
 
 	RectangleShape bullet;
 	Vector2f bulletPos;
+	Vector2f bulletPosTemp;
 	Vector2f bulletSize;
 	Vector2f bulletVelo;
 
 	int bulletFrame = 0;
-	bool bulletFire = false, bulletActive = false;
+	bool bulletFire = false, bulletActive = false, bulletTime = false;
 
 
 
@@ -81,7 +82,6 @@ private:
 
 	int enemySpeed = 5, enemySpawnFrame[4] = { 60, 120, 0, 300 }, enemyRight[4] = { -1, -1, 1, -1 };
 	int enemyHitNo = 0;
-	bool enemyCollide = false;
 	bool enemyWait[4] = { false, true, false, true };
 
 
@@ -114,7 +114,9 @@ private:
 
 	bool sit = false, jump = false, jumpFall = false, safeFall = false, heroBlink = false, bottom = false,
 		groundColX = false, releasedS = true, right = false, left = false, enableEffect = false;
-	bool over = false, restart = true, pause = false, groundCollide = false, borderCollide = false;
+	bool over = false, restart = true, pause = false,
+		groundColHero = false, borderColHero = false, enemyColHero = false,
+		groundColBullet = false, borderColBullet = false, enemyColBullet = false;
 
 public:
 
@@ -140,6 +142,8 @@ public:
 
 	void bulletp(double x, double y);
 
+	void bulletReset();
+
 	void jumping();
 
 	void disableSit();
@@ -148,9 +152,9 @@ public:
 
 	void physics();
 
-	void askMove(int xVelo, int yVelo);
+	void askMove();
 
-	void collision(int& i);
+	void collision(int& i, bool heroTurn, bool& groundColBase, bool& enemyColBase, bool& borderColBase, Vector2f& firstPos, Vector2f& firstSize, Vector2f& firstPosTemp);
 
 	void effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52]);
 
@@ -172,7 +176,7 @@ public:
 
 
 void Game::setWindow() {
-	width = VideoMode::getDesktopMode().width;
+	width = VideoMode::getDesktopMode().width - 100;
 	height = VideoMode::getDesktopMode().height;
 
 	window.create(VideoMode(width, height), "SFML Game", Style::None);
@@ -324,8 +328,10 @@ void Game::events() {
 	{
 		if (event.type == Event::Closed) window.close();
 
-
 		else if (event.type == Event::KeyPressed) {
+
+			cout << "\n " << event.key.code;
+
 
 			if (event.key.code == Keyboard::Escape) {
 				window.close();
@@ -343,6 +349,11 @@ void Game::events() {
 
 			else if (event.key.code == Keyboard::P && !over) {
 				pause = true;
+			}
+
+			else if (event.key.code == Keyboard::Tilde) {
+				if (!gunHide) { gunHide = true; }
+				else { gunHide = false; }
 			}
 		}
 
@@ -373,14 +384,11 @@ void Game::Restart() {
 	heroPos.x = 300;
 	heroPos.y = 0;
 
-	// RESET BULLET
-	if (bulletActive || bulletFire) {
-		bulletFire = false;
-		bulletActive = false;
-		bulletPos.x = -100;
-		bulletPos.y = -100;
+	if (bulletActive) {
+		bulletReset();
 	}
 
+	//CHECK OVER
 	if (healthCount == 0) {
 		over = true;
 	}
@@ -412,7 +420,7 @@ void Game::enemyPhysics() {
 
 void Game::enemyHit() {
 
-	if (enemyCollide) {
+	if (enemyColHero) {
 
 		if (heroPosTemp.y + heroSize.y <= enemyPos[enemyHitNo].y) {
 			heroEnemyJump = true;
@@ -432,53 +440,57 @@ void Game::mousep() {
 	mousePos.x = Mouse::getPosition().x;
 	mousePos.y = Mouse::getPosition().y;
 
-	if (event.type == Event::MouseButtonPressed && Mouse::isButtonPressed(Mouse::Left) && mouseReleased) {
-		bulletFire = true;
+	if (event.type == Event::MouseButtonPressed && Mouse::isButtonPressed(Mouse::Left) && mouseReleased) { 
+		if (!safeFall && !gunHide) {
+			bulletFire = true;
+		}
+
 		mouseReleased = false;
 	}
 }
 
 void Game::gunp() {
 
-	double x = mousePos.x - gunPos.x;
+	double x = mousePos.x - gunPos.x - heroSize.x;
 	double y = mousePos.y - gunPos.y;
 
-	// BULLET PHYSICS
-	bulletp(x, y);
-
-
-	gunRotation = 0;
 
 	// HERO SIDE
 	if (x >= 0) {
 		right = true;
 	}
-
 	else { left = true; }
+	
+	// BULLET PHYSICS
+	bulletp(x, y);
 
+	if (!gunHide) {
 
-	// GUN ROTATION
+		gunRotation = 0;
 
-	if (x < 0) {
-		gunRotation += 90;
-		if (y < 0) { gunRotation += 90; }
+		// GUN ROTATION
+
+		if (x < 0) {
+			gunRotation += 90;
+			if (y < 0) { gunRotation += 90; }
+		}
+		else if (y < 0) { gunRotation += 270; }
+
+		if ((x < 0 && y >= 0) || (x >= 0 && y < 0)) {
+			int temp = x;
+			x = y;
+			y = temp;
+		}
+
+		gunRotation += atan(abs(y) / abs(x)) * 180 / 3.1415;
+
+		gun.setRotation(gunRotation);
 	}
-	else if (y < 0) { gunRotation += 270; }
-
-	if ((x < 0 && y >= 0) || (x >= 0 && y < 0)) {
-		int temp = x;
-		x = y;
-		y = temp;
-	}
-
-	gunRotation += atan(abs(y) / abs(x)) * 180 / 3.1415;
-
-	gun.setRotation(gunRotation);
 }
 
 void Game::bulletp(double x, double y) {
 	if (bulletFire) {
-		if (!bulletActive) {
+		if (!bulletTime && !bulletActive) {
 
 			// FIND BULLET START POSITION
 			bulletPos = gunPos;
@@ -496,25 +508,35 @@ void Game::bulletp(double x, double y) {
 			// REST
 			bullet.setPosition(bulletPos);
 
+			bulletTime = true;
 			bulletActive = true;
 			bulletFrame = frame + 120;
 		}
 		bulletFire = false;
 	}
 
-	if (bulletActive) {
-		bulletPos.x += bulletVelo.x;
-		bulletPos.y += bulletVelo.y;
-
-		bullet.setPosition(bulletPos);
-
+	if (bulletTime) {
 
 		if (frame == bulletFrame) {
-			bulletActive = false;
-			bulletPos.x = -100;
-			bulletPos.y = -100;
+			bulletReset();
+			bulletTime = false;
+		}
+
+		if (bulletActive) {
+			bulletPosTemp = bulletPos;
+
+			bulletPos.x += bulletVelo.x;
+			bulletPos.y += bulletVelo.y;
+
+			bullet.setPosition(bulletPos);
 		}
 	}
+}
+
+void Game::bulletReset() {
+	bulletActive = false;
+	bulletPos.x = -100;
+	bulletPos.y = -100;
 }
 
 
@@ -604,13 +626,13 @@ void Game::physics() {
 	jumping();
 
 	//APPROVE MOVEMENT
-	askMove(xVelo, yVelo);
+	askMove();
 
 	//BREATHE
 	breathing();
 }
 
-void Game::askMove(int xVelo, int yVelo) {
+void Game::askMove() {
 	int i = 0;
 	bottom = false;
 
@@ -620,56 +642,61 @@ void Game::askMove(int xVelo, int yVelo) {
 	heroPos.x += xVelo;
 	heroPos.y += yVelo;
 
-	collision(i);
+	//HERO COL
+	collision(i, true, groundColHero, enemyColHero, borderColHero, heroPos, heroSize, heroPosTemp);
+
+	i = 0;
+	//BULLET COL
+	if (bulletActive) {
+		collision(i, false, groundColBullet, enemyColBullet, borderColBullet, bulletPos, bulletSize, bulletPosTemp);
+	}
 }
 
-void Game::collision(int& i) {
+void Game::collision(int& i, bool heroTurn, bool& groundColBase, bool& enemyColBase, bool& borderColBase, Vector2f& firstPos, Vector2f& firstSize, Vector2f& firstPosTemp) {
 	Collision collision;
 
-	groundCollide = false;
-	borderCollide = false;
-	enemyCollide = false;
+	groundColBase = false;
+	borderColBase = false;
+	enemyColBase = false;
 
 
 	//BORDER COL
-	if (heroPos.x < 0 || heroPos.x + heroSize.x > width || heroPos.y < 0) {
-		borderCollide = true;
+	if (firstPos.x < 0 || firstPos.x + firstSize.x > width || firstPos.y < 0 || firstPos.y + firstSize.y > height - terrainSize.y) {
+		borderColBase = true;
 
-		heroPos.x = heroPosTemp.x;
+		if (heroTurn) {
+			if (firstPos.y <= 0) { jumpFall = true; }
 
-		if (heroPos.y < 0) { jumpFall = true; }
+			else if (firstPos.y + firstSize.y > height - terrainSize.y) { healthCount--; restart = true; }
+
+			if (firstPos.x + firstSize.x > width) { heroPos.x = width - firstSize.x; }
+
+			else if (firstPos.x < 0) { heroPos.x = 0; }
+		}
 	}
-
-	if (heroPos.y + heroSize.y > height - terrainSize.y) {
-		healthCount--;
-		restart = true;
-	}
-
 
 	//GROUND COL
 	for (i = 0; i < groundNo; i++) {
-		groundCollide = collision.check(heroPos, groundPos[i], heroSize, groundSize[i]);
-		if (groundCollide) { break; }
+		groundColBase = collision.check(firstPos, groundPos[i], firstSize, groundSize[i]);
+		if (groundColBase) { break; }
 	}
 
-	// DETECT GROUND COL SIDE
-	if (groundCollide) {
+	// DETECT GROUND COL SIDE AND SET POSITION ACCORDINGLY
+	if (heroTurn && groundColBase) {
 
 		// LEFT
-		if (heroPosTemp.x + heroSize.x <= groundPos[i].x) {
-			heroPos.x = groundPos[i].x - heroSize.x;
-			groundColX = true;
+		if (firstPosTemp.x + firstSize.x <= groundPos[i].x) {
+			firstPos.x = groundPos[i].x - firstSize.x;
 		}
 
 		// RIGHT
-		else if (heroPosTemp.x >= groundPos[i].x + groundSize[i].x) {
-			heroPos.x = groundPos[i].x + groundSize[i].x;
-			groundColX = true;
+		else if (firstPosTemp.x >= groundPos[i].x + groundSize[i].x) {
+			firstPos.x = groundPos[i].x + groundSize[i].x;
 		}
 
 		// TOP
-		else if (heroPosTemp.y + heroSize.y <= groundPos[i].y) {
-			heroPos.y = groundPos[i].y - heroSize.y;
+		else if (firstPosTemp.y + firstSize.y <= groundPos[i].y) {
+			firstPos.y = groundPos[i].y - firstSize.y;
 
 			bottom = true;
 			if (safeFall) { safeFall = false; heroBlink = false; }
@@ -677,8 +704,8 @@ void Game::collision(int& i) {
 		}
 
 		// BOTTOM
-		else if (heroPosTemp.y >= groundPos[i].y + groundSize[i].y) {
-			heroPos.y = groundPos[i].y + groundSize[i].y;
+		else if (firstPosTemp.y >= groundPos[i].y + groundSize[i].y) {
+			firstPos.y = groundPos[i].y + groundSize[i].y;
 
 			if (jump) { jumpFall = true; }
 		}
@@ -688,8 +715,8 @@ void Game::collision(int& i) {
 	//ENEMY COL
 	if (!safeFall) {
 		for (i = 0; i <= 3; i++) {
-			enemyCollide = collision.check(heroPos, enemyPos[i], heroSize, enemySize);
-			if (enemyCollide) { enemyHitNo = i; break; }
+			enemyColBase = collision.check(firstPos, enemyPos[i], firstSize, enemySize);
+			if (enemyColBase) { enemyHitNo = i; break; }
 		}
 	}
 }
@@ -711,7 +738,7 @@ void Game::effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52
 
 
 	//MAKE EFFECT FOLLOW THE PREVIOUS
-	if (!groundCollide) { enableEffect = true; }
+	if (!groundColHero) { enableEffect = true; }
 
 	if (enableEffect) { if (effectStart < 51) { effectStart += 2; } }
 	else if (effectStart > -1) { effectStart -= 2; }
@@ -754,6 +781,11 @@ void Game::effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52
 		heroMask.setScale(0.1, 0.1);
 		heroMask.setOrigin(0, 0);
 		left = false;
+	}
+
+	//RESET BULLET
+	if (bulletActive && (groundColBullet || borderColBullet || enemyColBullet)) {
+		bulletReset();
 	}
 }
 
@@ -906,7 +938,7 @@ void Game::displays(RectangleShape heroEffect[52], RectangleShape rain[100]) {
 
 			window.draw(hero);
 			window.draw(heroMask);
-			window.draw(gun);
+			if (!gunHide) { window.draw(gun); }
 		}
 
 		if (bulletActive) {
