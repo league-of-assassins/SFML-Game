@@ -330,9 +330,6 @@ void Game::events() {
 
 		else if (event.type == Event::KeyPressed) {
 
-			cout << "\n " << event.key.code;
-
-
 			if (event.key.code == Keyboard::Escape) {
 				window.close();
 			}
@@ -420,15 +417,17 @@ void Game::enemyPhysics() {
 
 void Game::enemyHit() {
 
-	if (enemyColHero) {
+	if (enemyColHero || enemyColBullet) {
 
-		if (heroPosTemp.y + heroSize.y <= enemyPos[enemyHitNo].y) {
-			heroEnemyJump = true;
-		}
+		if (enemyColHero) {
+			if (heroPosTemp.y + heroSize.y <= enemyPos[enemyHitNo].y) {
+				heroEnemyJump = true;
+			}
 
-		else {
-			healthCount--;
-			restart = true;
+			else {
+				healthCount--;
+				restart = true;
+			}
 		}
 
 		int temp = (enemyRight[enemyHitNo] + 1) / 2 * (width + 50) - 50;
@@ -681,7 +680,7 @@ void Game::collision(int& i, bool heroTurn, bool& groundColBase, bool& enemyColB
 		if (groundColBase) { break; }
 	}
 
-	// DETECT GROUND COL SIDE AND SET POSITION ACCORDINGLY
+	// DETECT GROUND COL SIDE AND REMOVE GAP
 	if (heroTurn && groundColBase) {
 
 		// LEFT
