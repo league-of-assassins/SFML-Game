@@ -27,12 +27,46 @@ private:
 	Sprite gameOver;
 	Texture texture_gameOver;
 
+
+
 	Sprite heroMask;
 	Texture texture_heroMask;
 
-	RectangleShape hero;
-	Vector2f heroSize;
-	Vector2f heroPos;
+	RectangleShape heroHead;
+	Vector2f heroHeadSize;
+	Vector2f heroHeadPos;
+
+
+
+	RectangleShape heroBody;
+	Vector2f heroBodySize;
+	Vector2f heroBodyPos;
+
+
+	Vector2f heroTotalSize;
+	Vector2f heroTotalPos;
+
+
+	RectangleShape heroArm;
+
+	Vector2f heroArmPos;
+	Vector2f heroArmSize;
+
+	double armRotation = 0;
+
+
+
+	RectangleShape heroLegLeft;
+	Vector2f heroLegLeftPos;
+
+	RectangleShape heroLegRight;
+	Vector2f heroLegRightPos;
+
+	Vector2f heroLegSize;
+	Vector2f heroLegSizeTotal;
+
+
+
 	Vector2f heroPosTemp;
 
 	int xVelo = 0, yVelo = 7;
@@ -50,7 +84,7 @@ private:
 	Vector2f gunSize;
 
 	double gunRotation = 0;
-	bool gunHide = false;
+	bool emptyArms = false;
 
 
 
@@ -61,13 +95,13 @@ private:
 	Vector2f bulletVelo;
 
 	int bulletFrame = 0;
-	bool bulletFire = false, bulletActive = false, bulletTime = false;
+	bool fired = false, bulletActive = false, bulletTime = false, cut = false;
 
 
 
 	int heroEffectSize = 25, heroEffectCount = 52, effectStart = -1;
 	int breathingOrder = 1;
-	bool heroEnemyJump = false;
+	bool heroEnemyJump = false, enemyHitTop = false;
 
 
 
@@ -111,8 +145,7 @@ private:
 	int rainCount = 100;
 
 
-
-	bool sit = false, jump = false, jumpFall = false, safeFall = false, heroBlink = false, bottom = false,
+	bool sit = false, InitSit = false, jump = false, jumpFall = false, safeFall = false, heroBlink = false, bottom = false,
 		groundColX = false, releasedS = true, right = false, left = false, enableEffect = false;
 	bool over = false, restart = true, pause = false,
 		groundColHero = false, borderColHero = false, enemyColHero = false,
@@ -138,31 +171,37 @@ public:
 
 	void mousep();
 
-	void gunp();
+	void findRotation(double& rotation, double x, double y);
+
+	void armp(double& x, double& y);
+
+	void gunp(double& x, double& y);
 
 	void bulletp(double x, double y);
 
 	void bulletReset();
 
-	void jumping();
+	void Jump();
 
-	void disableSit();
+	void Sit();
 
 	void moveHeroKey();
 
 	void physics();
 
-	void askMove();
+	void colMain();
 
-	void collision(int& i, bool heroTurn, bool& groundColBase, bool& enemyColBase, bool& borderColBase, Vector2f& firstPos, Vector2f& firstSize, Vector2f& firstPosTemp);
+	void colBase(int& i, bool heroTurn, bool& groundColBase, bool& enemyColBase, bool& borderColBase, Vector2f& firstPos, Vector2f& firstSize, Vector2f& firstPosTemp);
+
+	void colGroundFix(int i, Vector2f& firstPos, Vector2f& firstSize, Vector2f& firstPosTemp);
 
 	void effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52]);
 
-	void rains(RectangleShape rain[100], Vector2f rainPos[100]);
+	void raining(RectangleShape rain[100], Vector2f rainPos[100]);
 
 	void breathing();
 
-	void setPositions();
+	void setPos();
 
 	void frames();
 
@@ -206,20 +245,53 @@ void Game::textures() {
 }
 
 void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100], Vector2f rainPos[100]) {
-
 	// HERO
-	heroSize.x = 50; heroSize.y = 80;
-	hero.setSize(heroSize);
-	hero.setFillColor(Color::Black);
-	heroPos.x = 25; heroPos.y = 25;
-	hero.setPosition(heroPos);
 
-	hero.setOutlineThickness(-1);
-	hero.setOutlineColor(Color::Cyan);
+	// HERO HEAD
+	heroHeadSize.x = 40; heroHeadSize.y = 40;
+	heroHead.setSize(heroHeadSize);
+	heroHead.setFillColor(Color::Black);
+	heroHeadPos.x = 25; heroHeadPos.y = 25;
+	heroHead.setPosition(heroHeadPos);
+
+
+
+	// HERO BODY
+	heroBodySize.x = 40; heroBodySize.y = 60;
+	heroBody.setSize(heroBodySize);
+	heroBody.setFillColor(Color::Black);
+	heroBodyPos.x = 25; heroBodyPos.y = 25;
+	heroBody.setPosition(heroBodyPos);
+	heroBody.setOutlineThickness(-1);
+	heroBody.setOutlineColor(Color::Cyan);
+
+	//HERO ARMS
+	heroArmSize.x = 50;
+	heroArmSize.y = 20;
+
+	heroArm.setFillColor(Color::Black);
+	heroArm.setSize(heroArmSize);
+	heroArm.setOrigin(0, heroArmSize.y / 2);
+	heroArm.setOutlineThickness(-1);
+	heroArm.setOutlineColor(Color::Cyan);
+
+
+	// HERO LEGS
+	heroLegSize.x = 20;
+	heroLegSize.y = 50;
+
+	heroLegSizeTotal.x = 40;
+	heroLegSizeTotal.y = 50;
+
+	heroLegLeft.setSize(heroLegSize);
+	heroLegLeft.setFillColor(Color::Black);
+
+
+	heroLegRight = heroLegLeft;
 
 	// HERO MASK
-	heroMask.setScale(0.1, 0.1);
-	heroMask.setPosition(heroPos);
+	heroMask.setScale(0.08, 0.08);
+	heroMask.setPosition(heroBodyPos);
 
 	// HERO GUN
 	gunSize.x = 100;
@@ -348,9 +420,9 @@ void Game::events() {
 				pause = true;
 			}
 
-			else if (event.key.code == Keyboard::Tilde) {
-				if (!gunHide) { gunHide = true; }
-				else { gunHide = false; }
+			else if (event.key.code == Keyboard::Q) {
+				if (!emptyArms) { emptyArms = true; }
+				else { emptyArms = false; }
 			}
 		}
 
@@ -360,10 +432,6 @@ void Game::events() {
 
 		else if (event.type == Event::MouseButtonReleased && event.mouseButton.button == Mouse::Left) {
 			mouseReleased = true;
-		}
-
-		else {
-			mousep();
 		}
 	}
 }
@@ -378,8 +446,8 @@ void Game::Restart() {
 
 	//RESET HERO
 	effectStart = -1;
-	heroPos.x = 300;
-	heroPos.y = 0;
+	heroBodyPos.x = 300;
+	heroBodyPos.y = 0;
 
 	if (bulletActive) {
 		bulletReset();
@@ -420,7 +488,8 @@ void Game::enemyHit() {
 	if (enemyColHero || enemyColBullet) {
 
 		if (enemyColHero) {
-			if (heroPosTemp.y + heroSize.y <= enemyPos[enemyHitNo].y) {
+			if (enemyHitTop) {
+				enemyHitTop = false;
 				heroEnemyJump = true;
 			}
 
@@ -439,19 +508,27 @@ void Game::mousep() {
 	mousePos.x = Mouse::getPosition().x;
 	mousePos.y = Mouse::getPosition().y;
 
-	if (event.type == Event::MouseButtonPressed && Mouse::isButtonPressed(Mouse::Left) && mouseReleased) { 
-		if (!safeFall && !gunHide) {
-			bulletFire = true;
+	double x = mousePos.x - gunPos.x - heroBodySize.x;
+	double y = mousePos.y - gunPos.y;
+
+	//DETECT MOUSE PRESS
+	if (Mouse::isButtonPressed(Mouse::Left)) {
+		if (emptyArms) {
+			cut = true;
 		}
 
-		mouseReleased = false;
+		else {
+			if (mouseReleased) {
+				if (!safeFall) {
+					fired = true;
+				}
+			}
+		}
+
+		if (mouseReleased) {
+			mouseReleased = false;
+		}
 	}
-}
-
-void Game::gunp() {
-
-	double x = mousePos.x - gunPos.x - heroSize.x;
-	double y = mousePos.y - gunPos.y;
 
 
 	// HERO SIDE
@@ -459,37 +536,67 @@ void Game::gunp() {
 		right = true;
 	}
 	else { left = true; }
-	
+
+	armp(x, y);
+
+	gunp(x, y);
+
+}
+
+void Game::findRotation(double& rotation, double x, double y) {
+
+	rotation = 0;
+
+	if (x < 0) {
+		rotation += 90;
+		if (y < 0) { rotation += 90; }
+	}
+	else if (y < 0) { rotation += 270; }
+
+	if ((x < 0 && y >= 0) || (x >= 0 && y < 0)) {
+		int temp = x;
+		x = y;
+		y = temp;
+	}
+
+	rotation += atan(abs(y) / abs(x)) * 180 / 3.1415;
+}
+
+void Game::armp(double& x, double& y) {
+	if (emptyArms) {
+		armRotation = 90;
+
+		if (cut) {
+			findRotation(armRotation, x, y);
+			cut = false;
+		}
+
+		heroArm.setRotation(armRotation);
+	}
+}
+
+void Game::gunp(double& x, double& y) {
+
 	// BULLET PHYSICS
 	bulletp(x, y);
 
-	if (!gunHide) {
 
-		gunRotation = 0;
+	if (!emptyArms) {
 
-		// GUN ROTATION
-
-		if (x < 0) {
-			gunRotation += 90;
-			if (y < 0) { gunRotation += 90; }
-		}
-		else if (y < 0) { gunRotation += 270; }
-
-		if ((x < 0 && y >= 0) || (x >= 0 && y < 0)) {
-			int temp = x;
-			x = y;
-			y = temp;
-		}
-
-		gunRotation += atan(abs(y) / abs(x)) * 180 / 3.1415;
+		findRotation(gunRotation, x, y);
 
 		gun.setRotation(gunRotation);
 	}
 }
 
 void Game::bulletp(double x, double y) {
-	if (bulletFire) {
-		if (!bulletTime && !bulletActive) {
+	if (fired) {
+		if (!emptyArms && !bulletTime && !bulletActive) {
+
+			// FIND BULLET ROTATION
+			double bulletRotation;
+			findRotation(bulletRotation, x, y);
+			bullet.setRotation(bulletRotation);
 
 			// FIND BULLET START POSITION
 			bulletPos = gunPos;
@@ -505,13 +612,11 @@ void Game::bulletp(double x, double y) {
 			bulletVelo.y = y * tempB / 5;
 
 			// REST
-			bullet.setPosition(bulletPos);
-
 			bulletTime = true;
 			bulletActive = true;
 			bulletFrame = frame + 120;
 		}
-		bulletFire = false;
+		fired = false;
 	}
 
 	if (bulletTime) {
@@ -527,6 +632,10 @@ void Game::bulletp(double x, double y) {
 			bulletPos.x += bulletVelo.x;
 			bulletPos.y += bulletVelo.y;
 
+			if (groundColBullet || borderColBullet || enemyColBullet) {
+				bulletReset();
+			}
+
 			bullet.setPosition(bulletPos);
 		}
 	}
@@ -536,10 +645,15 @@ void Game::bulletReset() {
 	bulletActive = false;
 	bulletPos.x = -100;
 	bulletPos.y = -100;
+
+	groundColBullet = false;
+	borderColBullet = false;
+	enemyColBullet = false;
+
 }
 
 
-void Game::jumping() {
+void Game::Jump() {
 	if (jump) {
 		if (!jumpFall && frame == jumpFrame) {
 			jumpFall = true;
@@ -560,12 +674,17 @@ void Game::jumping() {
 	}
 }
 
-void Game::disableSit() {
+void Game::Sit() {
+	if (InitSit) {
+		heroBodyPos.y += 20; heroBodySize.y -= 20; heroBody.setSize(heroBodySize);
+		InitSit = false;
+	}
+
 	if (sit && releasedS) {
 		sit = false;
-		heroSize.y += 20;
-		heroPos.y -= 20;
-		hero.setSize(heroSize);
+		heroBodySize.y += 20;
+		heroBodyPos.y -= 20;
+		heroBody.setSize(heroBodySize);
 		yVelo = 0;
 	}
 }
@@ -597,10 +716,9 @@ void Game::moveHeroKey() {
 
 	else if (Keyboard::isKeyPressed(Keyboard::S) && bottom) {
 		if (releasedS) {
-			heroPos.y += 20; heroSize.y -= 20; hero.setSize(heroSize);
+			InitSit = true;
 		}
 		sit = true;
-
 		releasedS = false;
 	}
 }
@@ -612,46 +730,61 @@ void Game::physics() {
 	//ENEMY PHYSICS
 	enemyPhysics();
 
-	//GUN PHYSICS
-	gunp();
-
-	//DISABLE SIT
-	disableSit();
-
 	//MOVE KEY INPUT
 	moveHeroKey();
 
 	//JUMP
-	jumping();
+	Jump();
+
+	//SIT
+	Sit();
 
 	//APPROVE MOVEMENT
-	askMove();
+	colMain();
 
 	//BREATHE
 	breathing();
 }
 
-void Game::askMove() {
+void Game::colMain() {
 	int i = 0;
 	bottom = false;
 
-
-	heroPosTemp = heroPos;
-
-	heroPos.x += xVelo;
-	heroPos.y += yVelo;
-
 	//HERO COL
-	collision(i, true, groundColHero, enemyColHero, borderColHero, heroPos, heroSize, heroPosTemp);
+	heroTotalPos.x = heroBodyPos.x;
+	heroTotalPos.y = heroBodyPos.y - heroHeadSize.y;
+	heroPosTemp = heroTotalPos;
+	heroTotalPos.x += xVelo;
+	heroTotalPos.y += yVelo;
 
-	i = 0;
+	heroTotalSize.x = heroHeadSize.x;
+	heroTotalSize.y = heroHeadSize.y + heroBodySize.y + heroLegSize.y;
+
+	colBase(i, true, groundColHero, enemyColHero, borderColHero, heroTotalPos, heroTotalSize, heroPosTemp);
+
+	double changeX = 0;
+	changeX = heroTotalPos.x - heroPosTemp.x;
+	double changeY = 0;
+	changeY = heroTotalPos.y - heroPosTemp.y;
+
+	heroHeadPos.x += changeX;
+	heroHeadPos.y += changeY;
+
+	heroBodyPos.x += changeX;
+	heroBodyPos.y += changeY;
+
+	heroLegLeftPos.x += changeX;
+	heroLegLeftPos.y += changeY;
+
+
 	//BULLET COL
 	if (bulletActive) {
-		collision(i, false, groundColBullet, enemyColBullet, borderColBullet, bulletPos, bulletSize, bulletPosTemp);
+		Vector2f bulletPosOrigin(bulletPos.x - bulletSize.x / 2, bulletPos.y - bulletSize.y / 2);
+		colBase(i, false, groundColBullet, enemyColBullet, borderColBullet, bulletPosOrigin, bulletSize, bulletPosTemp);
 	}
 }
 
-void Game::collision(int& i, bool heroTurn, bool& groundColBase, bool& enemyColBase, bool& borderColBase, Vector2f& firstPos, Vector2f& firstSize, Vector2f& firstPosTemp) {
+void Game::colBase(int& i, bool heroTurn, bool& groundColBase, bool& enemyColBase, bool& borderColBase, Vector2f& firstPos, Vector2f& firstSize, Vector2f& firstPosTemp) {
 	Collision collision;
 
 	groundColBase = false;
@@ -668,56 +801,68 @@ void Game::collision(int& i, bool heroTurn, bool& groundColBase, bool& enemyColB
 
 			else if (firstPos.y + firstSize.y > height - terrainSize.y) { healthCount--; restart = true; }
 
-			if (firstPos.x + firstSize.x > width) { heroPos.x = width - firstSize.x; }
+			if (firstPos.x + firstSize.x > width) { firstPos.x = width - firstSize.x; }
 
-			else if (firstPos.x < 0) { heroPos.x = 0; }
+			else if (firstPos.x < 0) { firstPos.x = 0; }
 		}
 	}
 
 	//GROUND COL
 	for (i = 0; i < groundNo; i++) {
-		groundColBase = collision.check(firstPos, groundPos[i], firstSize, groundSize[i]);
-		if (groundColBase) { break; }
-	}
+		if (collision.check(firstPos, groundPos[i], firstSize, groundSize[i])) {
+			groundColBase = true;
 
-	// DETECT GROUND COL SIDE AND REMOVE GAP
-	if (heroTurn && groundColBase) {
-
-		// LEFT
-		if (firstPosTemp.x + firstSize.x <= groundPos[i].x) {
-			firstPos.x = groundPos[i].x - firstSize.x;
-		}
-
-		// RIGHT
-		else if (firstPosTemp.x >= groundPos[i].x + groundSize[i].x) {
-			firstPos.x = groundPos[i].x + groundSize[i].x;
-		}
-
-		// TOP
-		else if (firstPosTemp.y + firstSize.y <= groundPos[i].y) {
-			firstPos.y = groundPos[i].y - firstSize.y;
-
-			bottom = true;
-			if (safeFall) { safeFall = false; heroBlink = false; }
-			if (jump) { jump = false; jumpFall = false; }
-		}
-
-		// BOTTOM
-		else if (firstPosTemp.y >= groundPos[i].y + groundSize[i].y) {
-			firstPos.y = groundPos[i].y + groundSize[i].y;
-
-			if (jump) { jumpFall = true; }
+			if (heroTurn) {
+				colGroundFix(i, firstPos, firstSize, firstPosTemp);
+			}
 		}
 	}
+
 
 
 	//ENEMY COL
 	if (!safeFall) {
 		for (i = 0; i <= 3; i++) {
-			enemyColBase = collision.check(firstPos, enemyPos[i], firstSize, enemySize);
-			if (enemyColBase) { enemyHitNo = i; break; }
+			if (collision.check(firstPos, enemyPos[i], firstSize, enemySize)) {
+				enemyColBase = true;
+				enemyHitNo = i;
+				if (firstPosTemp.y + firstSize.y <= enemyPos[enemyHitNo].y) {
+					enemyHitTop = true;
+				}
+				break;
+			}
 		}
 	}
+}
+
+void Game::colGroundFix(int i, Vector2f& firstPos, Vector2f& firstSize, Vector2f& firstPosTemp) {
+
+	// LEFT
+	if (firstPosTemp.x + firstSize.x <= groundPos[i].x) {
+		firstPos.x = groundPos[i].x - firstSize.x;
+	}
+
+	// RIGHT
+	else if (firstPosTemp.x >= groundPos[i].x + groundSize[i].x) {
+		firstPos.x = groundPos[i].x + groundSize[i].x;
+	}
+
+	// TOP
+	else if (firstPosTemp.y + firstSize.y <= groundPos[i].y) {
+		firstPos.y = groundPos[i].y - firstSize.y;
+
+		bottom = true;
+		if (safeFall) { safeFall = false; heroBlink = false; }
+		if (jump) { jump = false; jumpFall = false; }
+	}
+
+	// BOTTOM
+	else if (firstPosTemp.y >= groundPos[i].y + groundSize[i].y) {
+		firstPos.y = groundPos[i].y + groundSize[i].y;
+
+		if (jump) { jumpFall = true; }
+	}
+
 }
 
 bool Collision::check(Vector2f firstPos, Vector2f secondPos, Vector2f firstSize, Vector2f secondSize) {
@@ -733,8 +878,7 @@ bool Collision::check(Vector2f firstPos, Vector2f secondPos, Vector2f firstSize,
 
 void Game::effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52]) {
 	int gap = 3;
-	int n = -1;
-
+	int side = -1;
 
 	//MAKE EFFECT FOLLOW THE PREVIOUS
 	if (!groundColHero) { enableEffect = true; }
@@ -745,17 +889,17 @@ void Game::effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52
 	if (effectStart > -1) {
 
 		for (int i = 0; i <= 1; i++) {
-			heroEffectPos[i].x = heroPos.x + heroSize.x / 2 + gap;
-			heroEffectPos[i].y = heroPos.y + heroSize.y / 2 - gap;
+			heroEffectPos[i].x = heroBodyPos.x + heroBodySize.x / 2 + gap;
+			heroEffectPos[i].y = heroBodyPos.y + heroBodySize.y / 2 - gap;
 			heroEffect[i].setPosition(heroEffectPos[i]);
 			gap *= -1;
 		}
 
 		if (effectStart > 1) {
 			for (int i = effectStart; i > 1; i -= 2) {
-				n *= -1;
+				side *= -1;
 				for (int j = 0; j <= 1; j++) {
-					heroEffect[i - j].rotate(20 * n);
+					heroEffect[i - j].rotate(20 * side);
 					heroEffectPos[i - j] = heroEffectPos[i - j - 2];
 					heroEffect[i - j].setPosition(heroEffectPos[i - j]);
 				}
@@ -771,20 +915,15 @@ void Game::effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52
 
 	//SET MASK SIDE
 	if (right) {
-		heroMask.setScale(-0.1, 0.1);
+		heroMask.setScale(-0.08, 0.08);
 		heroMask.setOrigin(500, 0);
 		right = false;
 	}
 
 	else if (left) {
-		heroMask.setScale(0.1, 0.1);
+		heroMask.setScale(0.08, 0.08);
 		heroMask.setOrigin(0, 0);
 		left = false;
-	}
-
-	//RESET BULLET
-	if (bulletActive && (groundColBullet || borderColBullet || enemyColBullet)) {
-		bulletReset();
 	}
 }
 
@@ -792,21 +931,37 @@ void Game::breathing() {
 
 	if (bottom || (breathingOrder == -1 && (jump || (!bottom && !jump)))) {
 		if (jump || frame % 30 == 0) {
-			heroSize.y -= 5 * breathingOrder;
-			heroPos.y += 5 * breathingOrder;
+			heroBodySize.y -= 5 * breathingOrder;
+			heroBodyPos.y += 5 * breathingOrder;
 			breathingOrder *= -1;
-			hero.setSize(heroSize);
+			heroBody.setSize(heroBodySize);
 		}
 	}
 }
 
-void Game::setPositions() {
-	gunPos.x = heroPos.x + heroSize.x / 2;
-	gunPos.y = heroPos.y + heroSize.y / 2 + gunSize.y / 2;
+void Game::setPos() {
+	gunPos.x = heroBodyPos.x + heroBodySize.x / 2;
+	gunPos.y = heroBodyPos.y + heroBodySize.y / 2;
 	gun.setPosition(gunPos);
 
-	heroMask.setPosition(heroPos);
-	hero.setPosition(heroPos);
+	heroHeadPos.x = heroBodyPos.x;
+	heroHeadPos.y = heroBodyPos.y - heroHeadSize.y;
+	heroHead.setPosition(heroHeadPos);
+	heroMask.setPosition(heroHeadPos);
+
+	heroArmPos.x = heroBodyPos.x + heroBodySize.x / 2;
+	heroArmPos.y = heroBodyPos.y + heroBodySize.y * 0.25;
+	heroArm.setPosition(heroArmPos);
+
+	heroBody.setPosition(heroBodyPos);
+
+	heroLegLeftPos.x = heroBodyPos.x + heroBodySize.x / 2 - heroLegSize.x;
+	heroLegLeftPos.y = heroBodyPos.y + heroBodySize.y;
+	heroLegLeft.setPosition(heroLegLeftPos);
+
+	heroLegRightPos.x = heroLegLeftPos.x + heroLegSize.x;
+	heroLegRightPos.y = heroLegLeftPos.y;
+	heroLegRight.setPosition(heroLegRightPos);
 }
 
 void Game::frames() {
@@ -826,7 +981,7 @@ void Game::frames() {
 }
 
 
-void Game::rains(RectangleShape rain[100], Vector2f rainPos[100]) {
+void Game::raining(RectangleShape rain[100], Vector2f rainPos[100]) {
 
 	//UPDATE RAIN POSITION
 	for (int i = 0; i < rainCount; i++) {
@@ -864,6 +1019,7 @@ Game::Game() {
 
 		events();
 
+		mousep();
 
 
 		if (!over && !pause) {
@@ -878,9 +1034,9 @@ Game::Game() {
 
 			effectUpdate(heroEffect, heroEffectPos);
 
-			rains(rain, rainPos);
+			raining(rain, rainPos);
 
-			setPositions();
+			setPos();
 
 			frames();
 		}
@@ -935,9 +1091,22 @@ void Game::displays(RectangleShape heroEffect[52], RectangleShape rain[100]) {
 				}
 			}
 
-			window.draw(hero);
+			window.draw(heroHead);
 			window.draw(heroMask);
-			if (!gunHide) { window.draw(gun); }
+
+			window.draw(heroBody);
+
+			window.draw(heroLegLeft);
+			window.draw(heroLegRight);
+
+			if (emptyArms) {
+				window.draw(heroArm);
+				window.draw(heroArm);
+			}
+
+			else {
+				window.draw(gun);
+			}
 		}
 
 		if (bulletActive) {
@@ -972,4 +1141,7 @@ int main()
 		ADD BULLET FIRE ANIMATION
 		CHANGE ENEMY SPRITE
 		CHANGE GUN & BULLET SPRITE
+
+		FIX CORNER COLLISION
+
 */
