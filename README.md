@@ -12,7 +12,7 @@ Key Inputs:
 	Restart/Resume: R
 	Shoot: Left Mouse Click
 	Aim: Mouse Movement
-	Show/Hide Gun: Tilde (~)
+	Show/Hide Gun: Q
 
 
 Notes: Still in development and my main focus is on game logic/physics so visuals are in background plan for now
