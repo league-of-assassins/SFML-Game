@@ -31,11 +31,13 @@ private:
 
 	Sprite heroMask;
 	Texture texture_heroMask;
+	double heroMaskScale;
+	double heroMaskSize;
+
 
 	RectangleShape heroHead;
 	Vector2f heroHeadSize;
 	Vector2f heroHeadPos;
-
 
 
 	RectangleShape heroBody;
@@ -48,7 +50,6 @@ private:
 
 
 	RectangleShape heroArm;
-
 	Vector2f heroArmPos;
 	Vector2f heroArmSize;
 
@@ -95,13 +96,16 @@ private:
 	Vector2f bulletVelo;
 
 	int bulletFrame = 0;
-	bool fired = false, bulletActive = false, bulletTime = false, cut = false;
+	bool fired = false, bulletActive = false, bulletCooldown = false, cut = false;
 
 
+
+
+	RectangleShape heroEffect[52];
+	Vector2f heroEffectPos[52];
 
 	int heroEffectSize = 25, heroEffectCount = 52, effectStart = -1;
-	int breathingOrder = 1;
-	bool heroEnemyJump = false, enemyHitTop = false;
+	bool enableEffect = false;
 
 
 
@@ -117,6 +121,7 @@ private:
 	int enemySpeed = 5, enemySpawnFrame[4] = { 60, 120, 0, 300 }, enemyRight[4] = { -1, -1, 1, -1 };
 	int enemyHitNo = 0;
 	bool enemyWait[4] = { false, true, false, true };
+	bool heroEnemyJump = false, enemyHitTop = false;
 
 
 
@@ -136,19 +141,24 @@ private:
 	int groundNo = 12;
 
 
-
 	RectangleShape terrain;
 	Vector2f terrainSize;
 
 
+	RectangleShape rain[100];
+	Vector2f rainPos[100];
 
 	int rainCount = 100;
 
 
-	bool sit = false, InitSit = false, jump = false, jumpFall = false, safeFall = false, heroBlink = false, bottom = false,
-		groundColX = false, releasedS = true, right = false, left = false, enableEffect = false;
+
+	int breathingOrder = 1;
+
+	bool InitSit = false, sit = false, jump = false, jumpFall = false, safeFall = false, heroBlink = false, bottom = false,
+		releasedS = true, right = false, left = false;
+
 	bool over = false, restart = true, pause = false,
-		groundColHero = false, borderColHero = false, enemyColHero = false,
+		groundColHero = false, borderColHero = false, enemyColHero = false, groundColX = false,
 		groundColBullet = false, borderColBullet = false, enemyColBullet = false;
 
 public:
@@ -159,7 +169,7 @@ public:
 
 	void textures();
 
-	void objects(RectangleShape heroEffect[52], RectangleShape rain[100], Vector2f rainPos[100]);
+	void objects();
 
 	void events();
 
@@ -169,15 +179,15 @@ public:
 
 	void enemyHit();
 
-	void mousep();
+	void mouseMain();
 
 	void findRotation(double& rotation, double x, double y);
 
 	void armp(double& x, double& y);
 
-	void gunp(double& x, double& y);
+	void gunMain(double& x, double& y);
 
-	void bulletp(double x, double y);
+	void bulletMain(double x, double y);
 
 	void bulletReset();
 
@@ -193,11 +203,11 @@ public:
 
 	void colBase(int& i, bool heroTurn, bool& groundColBase, bool& enemyColBase, bool& borderColBase, Vector2f& firstPos, Vector2f& firstSize, Vector2f& firstPosTemp);
 
-	void colGroundFix(int i, Vector2f& firstPos, Vector2f& firstSize, Vector2f& firstPosTemp);
+	void colGroundFixPos(int i, Vector2f& firstPos, Vector2f& firstSize, Vector2f& firstPosTemp);
 
-	void effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52]);
+	void effectUpdate();
 
-	void raining(RectangleShape rain[100], Vector2f rainPos[100]);
+	void raining();
 
 	void breathing();
 
@@ -205,7 +215,7 @@ public:
 
 	void frames();
 
-	void displays(RectangleShape heroEffect[52], RectangleShape rain[100]);
+	void displays();
 
 	Game();
 
@@ -244,30 +254,34 @@ void Game::textures() {
 	heroMask.setTexture(texture_heroMask);
 }
 
-void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100], Vector2f rainPos[100]) {
+void Game::objects() {
+
 	// HERO
+	double heroBaseSize = 40;
 
 	// HERO HEAD
-	heroHeadSize.x = 40; heroHeadSize.y = 40;
+	heroHeadSize.x = heroBaseSize; heroHeadSize.y = heroHeadSize.x;
 	heroHead.setSize(heroHeadSize);
 	heroHead.setFillColor(Color::Black);
-	heroHeadPos.x = 25; heroHeadPos.y = 25;
-	heroHead.setPosition(heroHeadPos);
 
+
+	// HERO MASK
+	heroMaskSize = 500;
+	heroMaskScale = heroHeadSize.x / heroMaskSize;
+	heroMask.setScale(heroMaskScale, heroMaskScale);
 
 
 	// HERO BODY
-	heroBodySize.x = 40; heroBodySize.y = 60;
+	heroBodySize.x = heroBaseSize; heroBodySize.y = heroBodySize.x * 1.25;
 	heroBody.setSize(heroBodySize);
 	heroBody.setFillColor(Color::Black);
-	heroBodyPos.x = 25; heroBodyPos.y = 25;
-	heroBody.setPosition(heroBodyPos);
 	heroBody.setOutlineThickness(-1);
 	heroBody.setOutlineColor(Color::Cyan);
 
+
 	//HERO ARMS
-	heroArmSize.x = 50;
-	heroArmSize.y = 20;
+	heroArmSize.x = heroBaseSize * 1.25;
+	heroArmSize.y = heroBaseSize / 2;
 
 	heroArm.setFillColor(Color::Black);
 	heroArm.setSize(heroArmSize);
@@ -277,11 +291,11 @@ void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100], Vect
 
 
 	// HERO LEGS
-	heroLegSize.x = 20;
-	heroLegSize.y = 50;
+	heroLegSize.x = heroBaseSize / 2;
+	heroLegSize.y = heroBaseSize * 1.5;
 
-	heroLegSizeTotal.x = 40;
-	heroLegSizeTotal.y = 50;
+	heroLegSizeTotal.x = heroLegSize.x * 2;
+	heroLegSizeTotal.y = heroLegSize.y;
 
 	heroLegLeft.setSize(heroLegSize);
 	heroLegLeft.setFillColor(Color::Black);
@@ -289,13 +303,10 @@ void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100], Vect
 
 	heroLegRight = heroLegLeft;
 
-	// HERO MASK
-	heroMask.setScale(0.08, 0.08);
-	heroMask.setPosition(heroBodyPos);
 
 	// HERO GUN
-	gunSize.x = 100;
-	gunSize.y = 20;
+	gunSize.x = heroBaseSize * 2.5;
+	gunSize.y = heroBaseSize / 2;
 	gun.setSize(gunSize);
 	gun.setFillColor(Color::Black);
 	gun.setOrigin(0, gunSize.y / 2);
@@ -305,8 +316,8 @@ void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100], Vect
 
 
 	// BULLET
-	bulletSize.x = 20;
-	bulletSize.y = 20;
+	bulletSize.x = heroBaseSize / 2;
+	bulletSize.y = heroBaseSize / 2;
 
 	bullet.setSize(bulletSize);
 	bullet.setFillColor(Color::Black);
@@ -344,7 +355,7 @@ void Game::objects(RectangleShape heroEffect[52], RectangleShape rain[100], Vect
 	enemySize.y = 25;
 	enemy[0].setSize(enemySize);
 	enemy[0].setFillColor(Color::Red);
-	enemyPos[0].x = 0 - enemySize.x;
+	enemyPos[0].x = -enemySize.x;
 	enemyPos[0].y = 200;
 	enemy[0].setPosition(enemyPos[0]);
 
@@ -444,7 +455,7 @@ void Game::Restart() {
 	restart = false;
 	safeFall = true;
 
-	//RESET HERO
+	// RESET HERO
 	effectStart = -1;
 	heroBodyPos.x = 300;
 	heroBodyPos.y = 0;
@@ -453,7 +464,7 @@ void Game::Restart() {
 		bulletReset();
 	}
 
-	//CHECK OVER
+	// CHECK OVER
 	if (healthCount == 0) {
 		over = true;
 	}
@@ -504,14 +515,14 @@ void Game::enemyHit() {
 	}
 }
 
-void Game::mousep() {
+void Game::mouseMain() {
 	mousePos.x = Mouse::getPosition().x;
 	mousePos.y = Mouse::getPosition().y;
 
 	double x = mousePos.x - gunPos.x - heroBodySize.x;
 	double y = mousePos.y - gunPos.y;
 
-	//DETECT MOUSE PRESS
+	// DETECT MOUSE PRESS
 	if (Mouse::isButtonPressed(Mouse::Left)) {
 		if (emptyArms) {
 			cut = true;
@@ -539,7 +550,7 @@ void Game::mousep() {
 
 	armp(x, y);
 
-	gunp(x, y);
+	gunMain(x, y);
 
 }
 
@@ -575,10 +586,10 @@ void Game::armp(double& x, double& y) {
 	}
 }
 
-void Game::gunp(double& x, double& y) {
+void Game::gunMain(double& x, double& y) {
 
 	// BULLET PHYSICS
-	bulletp(x, y);
+	bulletMain(x, y);
 
 
 	if (!emptyArms) {
@@ -589,9 +600,9 @@ void Game::gunp(double& x, double& y) {
 	}
 }
 
-void Game::bulletp(double x, double y) {
+void Game::bulletMain(double x, double y) {
 	if (fired) {
-		if (!emptyArms && !bulletTime && !bulletActive) {
+		if (!emptyArms && !bulletCooldown && !bulletActive) {
 
 			// FIND BULLET ROTATION
 			double bulletRotation;
@@ -612,18 +623,18 @@ void Game::bulletp(double x, double y) {
 			bulletVelo.y = y * tempB / 5;
 
 			// REST
-			bulletTime = true;
+			bulletCooldown = true;
 			bulletActive = true;
 			bulletFrame = frame + 120;
 		}
 		fired = false;
 	}
 
-	if (bulletTime) {
+	if (bulletCooldown) {
 
 		if (frame == bulletFrame) {
 			bulletReset();
-			bulletTime = false;
+			bulletCooldown = false;
 		}
 
 		if (bulletActive) {
@@ -750,7 +761,7 @@ void Game::colMain() {
 	int i = 0;
 	bottom = false;
 
-	//HERO COL
+	// HERO COL
 	heroTotalPos.x = heroBodyPos.x;
 	heroTotalPos.y = heroBodyPos.y - heroHeadSize.y;
 	heroPosTemp = heroTotalPos;
@@ -777,7 +788,7 @@ void Game::colMain() {
 	heroLegLeftPos.y += changeY;
 
 
-	//BULLET COL
+	// BULLET COL
 	if (bulletActive) {
 		Vector2f bulletPosOrigin(bulletPos.x - bulletSize.x / 2, bulletPos.y - bulletSize.y / 2);
 		colBase(i, false, groundColBullet, enemyColBullet, borderColBullet, bulletPosOrigin, bulletSize, bulletPosTemp);
@@ -792,7 +803,7 @@ void Game::colBase(int& i, bool heroTurn, bool& groundColBase, bool& enemyColBas
 	enemyColBase = false;
 
 
-	//BORDER COL
+	// BORDER COL
 	if (firstPos.x < 0 || firstPos.x + firstSize.x > width || firstPos.y < 0 || firstPos.y + firstSize.y > height - terrainSize.y) {
 		borderColBase = true;
 
@@ -807,20 +818,20 @@ void Game::colBase(int& i, bool heroTurn, bool& groundColBase, bool& enemyColBas
 		}
 	}
 
-	//GROUND COL
+	// GROUND COL
 	for (i = 0; i < groundNo; i++) {
 		if (collision.check(firstPos, groundPos[i], firstSize, groundSize[i])) {
 			groundColBase = true;
 
 			if (heroTurn) {
-				colGroundFix(i, firstPos, firstSize, firstPosTemp);
+				colGroundFixPos(i, firstPos, firstSize, firstPosTemp);
 			}
 		}
 	}
 
 
 
-	//ENEMY COL
+	// ENEMY COL
 	if (!safeFall) {
 		for (i = 0; i <= 3; i++) {
 			if (collision.check(firstPos, enemyPos[i], firstSize, enemySize)) {
@@ -835,7 +846,7 @@ void Game::colBase(int& i, bool heroTurn, bool& groundColBase, bool& enemyColBas
 	}
 }
 
-void Game::colGroundFix(int i, Vector2f& firstPos, Vector2f& firstSize, Vector2f& firstPosTemp) {
+void Game::colGroundFixPos(int i, Vector2f& firstPos, Vector2f& firstSize, Vector2f& firstPosTemp) {
 
 	// LEFT
 	if (firstPosTemp.x + firstSize.x <= groundPos[i].x) {
@@ -876,11 +887,11 @@ bool Collision::check(Vector2f firstPos, Vector2f secondPos, Vector2f firstSize,
 	return collide;
 }
 
-void Game::effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52]) {
+void Game::effectUpdate() {
 	int gap = 3;
 	int side = -1;
 
-	//MAKE EFFECT FOLLOW THE PREVIOUS
+	// MAKE EFFECT FOLLOW THE PREVIOUS
 	if (!groundColHero) { enableEffect = true; }
 
 	if (enableEffect) { if (effectStart < 51) { effectStart += 2; } }
@@ -913,15 +924,15 @@ void Game::effectUpdate(RectangleShape heroEffect[52], Vector2f heroEffectPos[52
 		else { heroBlink = false; }
 	}
 
-	//SET MASK SIDE
+	// SET MASK SIDE
 	if (right) {
-		heroMask.setScale(-0.08, 0.08);
-		heroMask.setOrigin(500, 0);
+		heroMask.setScale(-heroMaskScale, heroMaskScale);
+		heroMask.setOrigin(heroMaskSize, 0);
 		right = false;
 	}
 
 	else if (left) {
-		heroMask.setScale(0.08, 0.08);
+		heroMask.setScale(heroMaskScale, heroMaskScale);
 		heroMask.setOrigin(0, 0);
 		left = false;
 	}
@@ -967,7 +978,7 @@ void Game::setPos() {
 void Game::frames() {
 	frame++;
 
-	//RESET FRAME
+	// RESET FRAME
 	if (frame == 99999) {
 		jumpFrame -= frame;
 
@@ -976,14 +987,16 @@ void Game::frames() {
 		for (int i = 0; i <= 3; i++) {
 			if (enemyWait[i]) { enemySpawnFrame[i] -= frame; }
 		}
+
 		frame = 0;
 	}
+
 }
 
 
-void Game::raining(RectangleShape rain[100], Vector2f rainPos[100]) {
+void Game::raining() {
 
-	//UPDATE RAIN POSITION
+	// UPDATE RAIN POSITION
 	for (int i = 0; i < rainCount; i++) {
 		rainPos[i].y += 5;
 		if (rainPos[i].y >= height) { rainPos[i].y = 0; }
@@ -996,18 +1009,12 @@ void Game::raining(RectangleShape rain[100], Vector2f rainPos[100]) {
 }
 
 Game::Game() {
-	//LARGE VARS SET AS LOCAL
-	RectangleShape heroEffect[52];
-	Vector2f heroEffectPos[52];
 
-	RectangleShape rain[100];
-	Vector2f rainPos[100];
-
-	//INITIALIZERS
+	// INITIALIZERS
 	setWindow();
 	fonts();
 	textures();
-	objects(heroEffect, rain, rainPos);
+	objects();
 
 
 	// MAIN LOOP
@@ -1019,7 +1026,7 @@ Game::Game() {
 
 		events();
 
-		mousep();
+		mouseMain();
 
 
 		if (!over && !pause) {
@@ -1032,9 +1039,9 @@ Game::Game() {
 
 			// EFFECTS
 
-			effectUpdate(heroEffect, heroEffectPos);
+			effectUpdate();
 
-			raining(rain, rainPos);
+			raining();
 
 			setPos();
 
@@ -1051,18 +1058,18 @@ Game::Game() {
 
 		// DISPLAY
 
-		displays(heroEffect, rain);
+		displays();
 	}
 }
 
 Game::~Game() {}
 
-void Game::displays(RectangleShape heroEffect[52], RectangleShape rain[100]) {
+void Game::displays() {
 
-	//BACKGROUND COLOR
+	// BACKGROUND COLOR
 	window.clear(Color::White);
 
-	//DRAW OBJECTS
+	// DRAW OBJECTS
 	if (!over) {
 
 		for (int i = 0; i < rainCount; i++) {
@@ -1101,7 +1108,6 @@ void Game::displays(RectangleShape heroEffect[52], RectangleShape rain[100]) {
 
 			if (emptyArms) {
 				window.draw(heroArm);
-				window.draw(heroArm);
 			}
 
 			else {
@@ -1118,7 +1124,7 @@ void Game::displays(RectangleShape heroEffect[52], RectangleShape rain[100]) {
 		window.draw(gameOver);
 	}
 
-	//DISPLAY THE OBJECTS
+	// DISPLAY THE OBJECTS
 	window.display();
 }
 
@@ -1137,11 +1143,12 @@ int main()
 	TO DO:
 		ADD FALLING OBJECTS WHICH YOU CAN SHOOT WITH YOUR WEAPON
 		DROP HEALTH ITEM WITH LUCK IF ENEMY HIT
-		FIX ENEMY SPAWN POSITIONS
 		ADD BULLET FIRE ANIMATION
 		CHANGE ENEMY SPRITE
 		CHANGE GUN & BULLET SPRITE
 
-		FIX CORNER COLLISION
 
+		FIX DOUBLE COLLISION
+		FIX ENEMY SPAWN POSITIONS
+		FIX HERO SITTING ANIMATION
 */
